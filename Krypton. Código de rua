@@ -51,17 +51,31 @@ KryptonConfiguration = {
 	},
 }
 
--- EXECUÇÃO DO KRYPTON
+-- 1. EXECUÇÃO DO KRYPTON
 loadstring(game:HttpGet("https://raw.githubusercontent.com/KadeTheExploiter/Krypton/main/Module.luau"))()
 
--- ESPERA O CORPO SER CRIADO E FORÇA O CONTROLE
+-- 2. ROTINA DE CONTROLE E ARMAS
 task.spawn(function()
-    task.wait(4) -- Tempo para o Krypton montar o Tetris
+    task.wait(4)
     local player = game.Players.LocalPlayer
     local character = player.Character
+
+    -- Forçar transferência
     if character and character:FindFirstChild("Humanoid") then
         character.Humanoid.Health = 0
-        -- Se o jogo permitir, removemos o Humanoide original
         pcall(function() character.Humanoid:Destroy() end)
     end
+
+    -- Monitorar Armas
+    player.Backpack.ChildAdded:Connect(function(tool)
+        if tool:IsA("Tool") then
+            tool.Equipped:Connect(function()
+                task.wait(0.1)
+                local tetris = workspace:FindFirstChild("Tetris")
+                if tetris and tetris:FindFirstChild("Right Arm") then
+                    tool.Parent = tetris
+                end
+            end)
+        end
+    end)
 end)
