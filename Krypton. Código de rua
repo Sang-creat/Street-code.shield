@@ -1,3 +1,4 @@
+-- CONFIGURAÇÃO DO KRYPTON
 KryptonConfiguration = {
 	WaitTime = 2,
 	FakeRigScale = 1,
@@ -7,13 +8,13 @@ KryptonConfiguration = {
 	RigName = "Tetris",
 	ReturnOnDeath = true,
 	Flinging = {
-		Enabled = false, -- Desativado para evitar crash no Código de Rua
+		Enabled = false,
 		MethodUsed = "Tool",
 		FlingMagnitude = 8000,
 	},
 	Reclaim = false,
 	Refit = true,
-	SetCharacter = false, -- Alterado para false para o script não conflitar com seu corpo
+	SetCharacter = false, 
 	Animations = true,
 	NoCollisions = true,
 	AntiVoiding = true,
@@ -49,4 +50,18 @@ KryptonConfiguration = {
 		},
 	},
 }
+
+-- EXECUÇÃO DO KRYPTON
 loadstring(game:HttpGet("https://raw.githubusercontent.com/KadeTheExploiter/Krypton/main/Module.luau"))()
+
+-- ESPERA O CORPO SER CRIADO E FORÇA O CONTROLE
+task.spawn(function()
+    task.wait(4) -- Tempo para o Krypton montar o Tetris
+    local player = game.Players.LocalPlayer
+    local character = player.Character
+    if character and character:FindFirstChild("Humanoid") then
+        character.Humanoid.Health = 0
+        -- Se o jogo permitir, removemos o Humanoide original
+        pcall(function() character.Humanoid:Destroy() end)
+    end
+end)
