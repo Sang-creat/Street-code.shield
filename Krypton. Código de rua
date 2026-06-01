@@ -51,22 +51,29 @@ KryptonConfiguration = {
 	},
 }
 
--- 1. EXECUÇÃO DO KRYPTON
+-- EXECUÇÃO DO KRYPTON
 loadstring(game:HttpGet("https://raw.githubusercontent.com/KadeTheExploiter/Krypton/main/Module.luau"))()
 
--- 2. ROTINA DE CONTROLE E ARMAS
+-- ROTINA DE CÂMERA E CONTROLE
 task.spawn(function()
     task.wait(4)
     local player = game.Players.LocalPlayer
-    local character = player.Character
+    
+    -- 1. Forçar Câmera no Ursinho
+    local function fixCamera()
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+            workspace.CurrentCamera.CameraSubject = player.Character.Humanoid
+        end
+    end
+    game:GetService("RunService").RenderStepped:Connect(fixCamera)
 
-    -- Forçar transferência
-    if character and character:FindFirstChild("Humanoid") then
-        character.Humanoid.Health = 0
-        pcall(function() character.Humanoid:Destroy() end)
+    -- 2. Destruir Humanoide do Ursinho para tentar mover o controle para o Tetris
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        player.Character.Humanoid.Health = 0
+        pcall(function() player.Character.Humanoid:Destroy() end)
     end
 
-    -- Monitorar Armas
+    -- 3. Seguidor de Armas (Mover ferramentas para o Tetris)
     player.Backpack.ChildAdded:Connect(function(tool)
         if tool:IsA("Tool") then
             tool.Equipped:Connect(function()
