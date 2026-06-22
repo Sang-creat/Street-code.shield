@@ -1,66 +1,58 @@
--- ========================================================
--- MOD MENU INTEGRADO E SEGURO (Delta Optimized)
--- ========================================================
+-- Script Mobile: Network Ownership Manipulator (Código de Rua)
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
 
-local function initializeModMenu()
-    -- Tenta carregar a biblioteca Orion com tratamento de erro
-    local OrionLib
-    local success, err = pcall(function()
-        OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/shlexware/Orion/main/source')))()
-    end)
-
-    if not success then
-        warn("Erro ao carregar a biblioteca Orion: " .. tostring(err))
-        return
+-- Função para requisitar Network Ownership
+local function requestOwnership(part)
+    if part and part:IsA("BasePart") then
+        -- Tenta forçar o network ownership para o jogador local
+        -- Nota: Isso só funciona se o objeto for propriedade do servidor mas tiver física dinãmica
+        pcall(function()
+            settings().Physics.AllowSleep = false
+            part.CustomPhysicalProperties = PhysicalProperties.new(0, 0, 0)
+        end)
     end
-
-    local Window = OrionLib:MakeWindow({Name = "Delta Mod Menu - Seguro", HidePremium = false, SaveConfig = true, ConfigFolder = "DeltaModMenu"})
-
-    local Players = game:GetService("Players")
-    local RunService = game:GetService("RunService")
-    local LocalPlayer = Players.LocalPlayer
-    local activeLoops = {}
-
-    local function stopAll()
-        for _, conn in pairs(activeLoops) do if conn then conn:Disconnect() end end
-        table.clear(activeLoops)
-    end
-
-    -- ========================================================
-    -- ABAS
-    -- ========================================================
-    local LocalTab = Window:MakeTab({Name = "Local Player", Icon = "rbxassetid://4483362458"})
-    local CombatTab = Window:MakeTab({Name = "Combat", Icon = "rbxassetid://4483363412"})
-
-    -- ========================================================
-    -- FUNÇÕES
-    -- ========================================================
-    LocalTab:AddToggle({Name = "God Mode", Default = false, Callback = function(value)
-        if value then
-            local char = LocalPlayer.Character
-            local hum = char and char:FindFirstChild("Humanoid")
-            if hum then hum.MaxHealth = math.huge hum.Health = math.huge end
-        end
-    end})
-
-    CombatTab:AddToggle({Name = "Kill Aura", Default = false, Callback = function(value)
-        if value then
-            activeLoops["Aura"] = RunService.Heartbeat:Connect(function()
-                for _, plr in pairs(Players:GetPlayers()) do
-                    if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                        local dist = (plr.Character.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
-                        if dist < 15 then
-                            local hum = plr.Character:FindFirstChild("Humanoid")
-                            if hum then hum:TakeDamage(1) end 
-                        end
-                    end
-                end
-            end)
-        else stopAll() end
-    end})
-
-    OrionLib:Init()
 end
 
--- Inicia o processo
-initializeModMenu()
+-- ========================================================
+-- MOD MENU UI (Versão Mobile - Draggable)
+-- ========================================================
+local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Orion/main/source"))()
+local Window = OrionLib:MakeWindow({Name = "Network Mobile Mod", HidePremium = false, SaveConfig = true, ConfigFolder = "DeltaMobile"})
+
+local CombatTab = Window:MakeTab({Name = "Physics Combat", Icon = "rbxassetid://4483363412"})
+
+-- Função para "Travar" ou "Levitar" jogador (via Network)
+CombatTab:AddTextbox({
+    Name = "Target Username",
+    Default = "",
+    Callback = function(Value)
+        local target = Players:FindFirstChild(Value)
+        if target and target.Character then
+            local hrp = target.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                requestOwnership(hrp)
+                hrp.Velocity = Vector3.new(0, 50, 0) -- Força para cima
+            end
+        end
+    end
+})
+
+-- Voo Estilo Super-Herói
+local flying = false
+CombatTab:AddToggle({Name = "Hero Flight (Vel: 50)", Callback = function(v)
+    flying = v
+    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if flying and hrp then
+        local bv = Instance.new("BodyVelocity", hrp)
+        bv.MaxForce = Vector3.new(1/0, 1/0, 1/0)
+        bv.Velocity = hrp.CFrame.lookVector * 50
+        spawn(function()
+            while flying do task.wait() bv.Velocity = hrp.CFrame.lookVector * 50 end
+            bv:Destroy()
+        end)
+    end
+end})
+
+OrionLib:Init()
