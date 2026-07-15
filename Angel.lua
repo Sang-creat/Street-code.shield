@@ -1,53 +1,72 @@
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
+local P, RS, LP = game:GetService("Players"), game:GetService("RunService"), game:GetService("Players").LocalPlayer
+local UI = Instance.new("ScreenGui", game:GetService("CoreGui"))
+local F = Instance.new("Frame", UI) 
+F.Size, F.Position, F.BackgroundColor3, F.Active, F.Draggable = UDim2.new(0,220,0,400), UDim2.new(0.5,-110,0.5,-200), Color3.fromRGB(30,30,30), true, true
 
-local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
+-- Toggle de visibilidade
+local OpenClose = Instance.new("TextButton", UI)
+OpenClose.Size, OpenClose.Position, OpenClose.Text = UDim2.new(0, 100, 0, 40), UDim2.new(0, 10, 0, 10), "Menu ON/OFF"
+OpenClose.MouseButton1Click:Connect(function() F.Visible = not F.Visible end)
 
--- Criação da Interface (GUI)
-local ScreenGui = Instance.new("ScreenGui", game:GetService("CoreGui"))
-local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 200, 0, 300)
-MainFrame.Position = UDim2.new(0.5, -100, 0.5, -150)
-MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-MainFrame.Active = true
-MainFrame.Draggable = true -- Nativo do Roblox, funciona bem para mobile
+-- Variáveis de Estado
+local antiBring, antiKnock = false, false
 
--- Lista de Jogadores
-local ScrollingFrame = Instance.new("ScrollingFrame", MainFrame)
-ScrollingFrame.Size = UDim2.new(1, 0, 0.8, 0)
-ScrollingFrame.CanvasSize = UDim2.new(0, 0, 2, 0)
-
--- Função de Teleporte para as costas
-local function teleportBehind(targetPlayer)
-    if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        local targetCFrame = targetPlayer.Character.HumanoidRootPart.CFrame
-        LocalPlayer.Character.HumanoidRootPart.CFrame = targetCFrame * CFrame.new(0, 0, 3)
-    end
+-- Criação de botões de controle
+local function createToggle(name, stateVar)
+    local btn = Instance.new("TextButton", F)
+    btn.Size, btn.Text = UDim2.new(1, -10, 0, 40), name .. ": OFF"
+    btn.Position = UDim2.new(0, 5, 0, #F:GetChildren() * 45)
+    btn.MouseButton1Click:Connect(function()
+        _G[stateVar] = not _G[stateVar]
+        btn.Text = name .. (_G[stateVar] and ": ON" or ": OFF")
+    end)
+    return btn
 end
 
--- Lógica do Anti-Empurrão (Distância)
-RunService.Heartbeat:Connect(function()
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            local dist = (LocalPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
-            if dist < 3 then -- Raio de 3 studs
-                -- Empurra o inimigo para longe
-                local direction = (player.Character.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Unit
-                player.Character.HumanoidRootPart.Velocity = direction * 50
+_G.antiBring, _G.antiKnock = false, false
+createToggle("Anti-Bring", "antiBring")
+createToggle("Anti-Knock", "antiKnock")
+
+-- Lista de Jogadores
+local L = Instance.new("ScrollingFrame", F) 
+L.Size, L.Position, L.BackgroundColor3, L.CanvasSize = UDim2.new(1,0,0,150), UDim2.new(0,0,0,150), Color3.fromRGB(40,40,40), UDim2.new(0,0,2,0)
+
+local function tp(t)
+    local r = t.Character and t.Character:FindFirstChild("HumanoidRootPart")
+    if LP.Character and r then LP.Character.HumanoidRootPart.CFrame = r.CFrame * CFrame.new(0,0,3) end
+end
+
+RS.Heartbeat:Connect(function()
+    if not LP.Character then return end
+    -- Lógica Anti-Bring
+    if _G.antiBring then
+        for _, o in pairs(LP.Character:GetDescendants()) do
+            if (o:IsA("Weld") or o:IsA("WeldConstraint")) and o.Name ~= "RootJoint" then o:Destroy() end
+        end
+    end
+    -- Lógica Anti-Empurrão
+    if _G.antiKnock then
+        for _, p in pairs(P:GetPlayers()) do
+            if p ~= LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                local d = (LP.Character.HumanoidRootPart.Position - p.Character.HumanoidRootPart.Position).Magnitude
+                if d < 2 then p.Character.HumanoidRootPart.Velocity = (p.Character.HumanoidRootPart.Position - LP.Character.HumanoidRootPart.Position).Unit * 50 end
             end
         end
     end
 end)
 
--- Gerador de botões na lista
-for _, player in pairs(Players:GetPlayers()) do
-    local btn = Instance.new("TextButton", ScrollingFrame)
-    btn.Text = player.Name
-    btn.Size = UDim2.new(1, 0, 0, 40)
-    btn.MouseButton1Click:Connect(function()
-        teleportBehind(player)
-    end)
+local function refresh()
+    L:ClearAllChildren()
+    for _, p in pairs(P:GetPlayers()) do
+        if p ~= LP then
+            local b = Instance.new("TextButton", L)
+            b.Size, b.Position, b.Text = UDim2.new(1,-10,0,40), UDim2.new(0,5,0,#L:GetChildren()*45), "TP: "..p.Name
+            b.BackgroundColor3, b.TextColor3 = Color3.fromRGB(60,60,60), Color3.new(1,1,1)
+            b.MouseButton1Click:Connect(function() tp(p) end)
+        end
+    end
 end
+
+P.PlayerAdded:Connect(refresh) 
+P.PlayerRemoving:Connect(refresh) 
+refresh()
