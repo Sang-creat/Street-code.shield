@@ -5,7 +5,7 @@ local OC = Instance.new("TextButton", UI) OC.Size, OC.Position, OC.Text = UDim2.
 OC.MouseButton1Click:Connect(function() F.Visible = not F.Visible end)
 
 _G.ab, _G.ak, _G.fr, _G.jl, _G.ds, _G.lg = false, false, false, false, false, false
-_G.targ = nil
+_G.targ = nil _G.jailPart = nil
 
 local function mkT(n, v)
     local b = Instance.new("TextButton", F) b.Size, b.Text = UDim2.new(1,-10,0,30), n..": OFF"
@@ -18,20 +18,41 @@ local L = Instance.new("ScrollingFrame", F) L.Size, L.Position, L.CanvasSize = U
 
 RS.Heartbeat:Connect(function()
     if not LP.Character then return end
-    if _G.ab then for _,o in pairs(LP.Character:GetDescendants()) do if (o:IsA("Weld") or o:IsA("WeldConstraint")) and o.Name ~= "RootJoint" then o:Destroy() end end end
+    if _G.ab then 
+        for _,o in pairs(LP.Character:GetDescendants()) do 
+            if (o:IsA("Weld") or o:IsA("WeldConstraint")) and o.Name ~= "RootJoint" then o:Destroy() end 
+        end 
+    end
     
     if _G.targ and _G.targ.Character and _G.targ.Character:FindFirstChild("HumanoidRootPart") then
         local p = _G.targ.Character.HumanoidRootPart
         if _G.lg then LP.Character.HumanoidRootPart.CFrame = p.CFrame * CFrame.new(0,0,3) end
-        if _G.fr then p.CFrame = p.CFrame end -- Força a posição (Anti-Freeze local)
+        
+        if _G.fr then 
+            p.Anchored = true 
+            p.CFrame = p.CFrame 
+            p.Velocity = Vector3.new(0,0,0)
+            p.AssemblyLinearVelocity = Vector3.new(0,0,0)
+        else
+            p.Anchored = false
+        end
+        
         if _G.jl then 
-            for _,v in pairs({Vector3.new(0,0,5), Vector3.new(0,0,-5), Vector3.new(5,0,0), Vector3.new(-5,0,0)}) do 
-                local part = Instance.new("Part", workspace) part.Size = Vector3.new(1, 10, 10) part.Position = p.Position + v part.Anchored = true 
-                game.Debris:AddItem(part, 0.1) -- Limpeza automática para performance
-            end 
+            if not _G.jailPart or not _G.jailPart.Parent then
+                _G.jailPart = Instance.new("Part", workspace)
+                _G.jailPart.Size = Vector3.new(8, 15, 8)
+                _G.jailPart.Transparency = 0.5
+                _G.jailPart.Anchored = true
+                _G.jailPart.CanCollide = true
+            end
+            _G.jailPart.CFrame = p.CFrame + Vector3.new(0, 3, 0)
+            p.CFrame = _G.jailPart.CFrame
+        elseif _G.jailPart then
+            _G.jailPart:Destroy()
+            _G.jailPart = nil
         end
     end
-
+    
     for _,p in pairs(P:GetPlayers()) do
         if p ~= LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
             local dist = (LP.Character.HumanoidRootPart.Position - p.Character.HumanoidRootPart.Position).Magnitude
