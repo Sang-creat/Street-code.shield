@@ -4,13 +4,12 @@ local RemotoMain = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):
 local ESPADA_ID = 94794847
 local GEAR_NAME = "Gear" .. tostring(ESPADA_ID)
 
+-- UI E INTERFACE
 local UI = Instance.new("ScreenGui", game:GetService("CoreGui"))
-local F = Instance.new("Frame", UI) 
-F.Size, F.Position = UDim2.new(0, 650, 0, 450), UDim2.new(0.5, -325, 0.5, -225) 
+local F = Instance.new("Frame", UI) F.Size, F.Position = UDim2.new(0, 650, 0, 450), UDim2.new(0.5, -325, 0.5, -225) 
 F.BackgroundColor3, F.Active, F.Draggable = Color3.fromRGB(25, 25, 25), true, true
 
-local OC = Instance.new("TextButton", UI) 
-OC.Size, OC.Position = UDim2.new(0, 120, 0, 40), UDim2.new(0, 10, 0, 10) 
+local OC = Instance.new("TextButton", UI) OC.Size, OC.Position = UDim2.new(0, 120, 0, 40), UDim2.new(0, 10, 0, 10) 
 OC.Text, OC.BackgroundColor3 = "Menu (On/Off)", Color3.fromRGB(45, 45, 45)
 OC.MouseButton1Click:Connect(function() F.Visible = not F.Visible end)
 
@@ -23,12 +22,17 @@ local function mkT(n, v)
     b.MouseButton1Click:Connect(function() _G[v] = not _G[v] b.Text = n..(_G[v] and ": ON" or ": OFF") end)
 end
 
+-- CONTROLES GLOBAIS
 _G.ab, _G.af, _G.afz, _G.aj, _G.av, _G.lg, _G.go, _G.ds, _G.sr, _G.rk, _G.aeg = false, false, false, false, false, false, false, false, false, false, false
-_G.targ, _G.ringParts, _G.lastDisarmTime, _G.cooldownDuration, _G.angle = nil, {}, 0, 3.5, 0
+_G.targ, _G.ringParts, _G.lastDisarmTime, _G.cooldownDuration, _G.reachValue, _G.boxReachPart = nil, {}, 0, 3.5, 20, nil
 
 mkT("Anti-Bring", "ab"); mkT("Anti-Fling", "af"); mkT("Anti-Freeze", "afz"); mkT("Anti-Jail", "aj"); mkT("Anti-Void", "av")
-mkT("LoopGoto", "lg"); mkT("Goto", "go"); mkT("Disarm (Auto-Q)", "ds"); mkT("SuperRing", "sr"); mkT("Reach", "rk"); mkT("Auto-Equip Gear", "aeg")
+mkT("LoopGoto", "lg"); mkT("Goto", "go"); mkT("Disarm (Auto-Q)", "ds"); mkT("Cage-Trava", "sr"); mkT("Box-Reach", "rk"); mkT("Auto-Equip Gear", "aeg")
 
+local tb = Instance.new("TextBox", C) tb.Size, tb.Position = UDim2.new(0, 200, 0, 30), UDim2.new(0, 10, 0, #C:GetChildren() * 35 - 35)
+tb.PlaceholderText = "Reach Radius (Ex: 20)" tb.FocusLost:Connect(function() _G.reachValue = tonumber(tb.Text) or 20 end)
+
+-- AUTO-EQUIP
 task.spawn(function()
     while task.wait(2) do
         local char, bp = LP.Character, LP.Backpack
@@ -45,34 +49,40 @@ task.spawn(function()
     end
 end)
 
+-- LOOP PRINCIPAL
 RS.Heartbeat:Connect(function(dt)
     if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then return end
     if _G.ab or _G.af or _G.afz or _G.aj or _G.av then LP.Character.HumanoidRootPart.Velocity = Vector3.new(0, 0, 0) end
     
+    -- BOX REACH
+    if _G.rk then
+        if not _G.boxReachPart then _G.boxReachPart = Instance.new("Part", workspace) _G.boxReachPart.Anchored, _G.boxReachPart.CanCollide, _G.boxReachPart.Transparency = true, false, 0.8 end
+        _G.boxReachPart.Size = Vector3.new(_G.reachValue, 5, _G.reachValue)
+        _G.boxReachPart.CFrame = LP.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, -(_G.reachValue/2))
+    elseif _G.boxReachPart then _G.boxReachPart:Destroy() _G.boxReachPart = nil end
+    
+    -- CONTROLE DE ALVO
     if _G.targ and _G.targ.Character and _G.targ.Character:FindFirstChild("HumanoidRootPart") then
         local tHRP = _G.targ.Character.HumanoidRootPart
         if _G.lg then LP.Character.HumanoidRootPart.CFrame = tHRP.CFrame * CFrame.new(0, 0, 3) end
         if _G.go then LP.Character.HumanoidRootPart.CFrame = tHRP.CFrame * CFrame.new(0, 0, 3) _G.go = false end
         
+        -- DISARM
         if _G.ds then
             local espada = LP.Character:FindFirstChild(GEAR_NAME)
             local remote = espada and (espada:FindFirstChild("Remote") or espada:FindFirstChild("Client"))
-            if remote and (tick() - _G.lastDisarmTime) >= _G.cooldownDuration then
-                remote:FireServer(Enum.KeyCode.Q)
-                _G.lastDisarmTime = tick()
-            end
+            if remote and (tick() - _G.lastDisarmTime) >= _G.cooldownDuration then remote:FireServer(Enum.KeyCode.Q) _G.lastDisarmTime = tick() end
         end
         
+        -- CAGE TRAVA (ANCRADO)
         if _G.sr then
-            _G.angle = _G.angle + (dt * 15)
-            for i = 1, 8 do
-                if not _G.ringParts[i] or not _G.ringParts[i].Parent then
-                    local p = Instance.new("Part")
-                    p.Size, p.Anchored, p.CanCollide, p.Material, p.Parent = Vector3.new(1.5, 5, 1.5), true, true, Enum.Material.Neon, workspace
+            local offsets = {CFrame.new(1.8, 0, 0), CFrame.new(-1.8, 0, 0), CFrame.new(0, 0, 1.8), CFrame.new(0, 0, -1.8)}
+            for i = 1, 4 do
+                if not _G.ringParts[i] then
+                    local p = Instance.new("Part", workspace) p.Size, p.Anchored, p.CanCollide, p.Material = Vector3.new(2, 6, 2), true, true, Enum.Material.Neon
                     _G.ringParts[i] = p
                 end
-                local rad = (i / 8) * math.pi * 2 + _G.angle
-                _G.ringParts[i].CFrame = tHRP.CFrame * CFrame.new(math.cos(rad) * 1.5, 0, math.sin(rad) * 1.5)
+                _G.ringParts[i].CFrame = tHRP.CFrame * offsets[i]
             end
         else
             for _, p in pairs(_G.ringParts) do if p.Parent then p:Destroy() end end _G.ringParts = {}
