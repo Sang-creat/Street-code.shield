@@ -1,8 +1,4 @@
 local P, RS, LP = game:GetService("Players"), game:GetService("RunService"), game:GetService("Players").LocalPlayer
-local RemotoMain = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("AvatarMainRE")
-local ESPADA_ID = 94794847
-local GEAR_NAME = "Gear" .. tostring(ESPADA_ID)
-
 local UI = Instance.new("ScreenGui", game:GetService("CoreGui"))
 local ToggleBtn = Instance.new("TextButton", UI); ToggleBtn.Size = UDim2.new(0, 50, 0, 50); ToggleBtn.Position = UDim2.new(0, 10, 0.5, -25); ToggleBtn.Text = "MENU"; ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 255); ToggleBtn.Draggable = true
 
@@ -18,14 +14,34 @@ local function mkT(n, v)
 end
 
 _G.ab, _G.af, _G.afz, _G.aj, _G.av, _G.lg, _G.go, _G.ds, _G.sr, _G.aeg, _G.esp = false, false, false, false, false, false, false, false, false, false, false
-_G.targ, _G.lastDisarmTime, _G.cooldownDuration = nil, 0, 3.5
+_G.targ = nil
 
 mkT("Anti-Bring", "ab"); mkT("Anti-Fling", "af"); mkT("Anti-Freeze", "afz"); mkT("Anti-Jail", "aj"); mkT("Anti-Void", "av")
 mkT("LoopGoto", "lg"); mkT("Goto", "go"); mkT("Disarm", "ds"); mkT("Cage-Trava", "sr"); mkT("Auto-Equip", "aeg"); mkT("ESP", "esp")
 
+-- LÓGICA DE AUTO-EQUIP PERSISTENTE
+local function handleAutoEquip()
+    if _G.aeg and LP.Character then
+        local tool = LP.Backpack:FindFirstChildOfClass("Tool")
+        if tool and not LP.Character:FindFirstChildOfClass("Tool") then
+            LP.Character.Humanoid:EquipTool(tool)
+        end
+    end
+end
+
+LP.CharacterAdded:Connect(function() task.wait(1) handleAutoEquip() end)
+
 RS.Heartbeat:Connect(function()
     if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then return end
     local myHRP = LP.Character.HumanoidRootPart
+    
+    handleAutoEquip() -- Mantém a checagem ativa mas não trava em loop de equip
+
+    if _G.ds and _G.targ and _G.targ.Character then
+        for _, item in pairs(_G.targ.Character:GetChildren()) do
+            if item:IsA("Tool") then item.Parent = LP.Backpack end
+        end
+    end
 
     -- ESP SYSTEM
     for _, p in pairs(P:GetPlayers()) do
@@ -33,32 +49,26 @@ RS.Heartbeat:Connect(function()
             local head = p.Character:FindFirstChild("Head")
             if _G.esp and head and not head:FindFirstChild("ESP_TAG") then
                 local bill = Instance.new("BillboardGui", head); bill.Name = "ESP_TAG"; bill.Size = UDim2.new(0, 200, 0, 50); bill.AlwaysOnTop = true
-                local lbl = Instance.new("TextLabel", bill); lbl.Size = UDim2.new(1, 0, 1, 0); lbl.BackgroundTransparency = 1; lbl.TextColor3 = Color3.new(1,1,1)
-                local h = Instance.new("Highlight", p.Character); h.Name = "ESP_HIGH"
+                Instance.new("TextLabel", bill).Size = UDim2.new(1,0,1,0); Instance.new("Highlight", p.Character).Name = "ESP_HIGH"
             elseif not _G.esp then
                 if head:FindFirstChild("ESP_TAG") then head.ESP_TAG:Destroy() end
                 if p.Character:FindFirstChild("ESP_HIGH") then p.Character.ESP_HIGH:Destroy() end
-            elseif head:FindFirstChild("ESP_TAG") then
-                local dist = math.floor((head.Position - myHRP.Position).Magnitude)
-                head.ESP_TAG.TextLabel.Text = p.Name .. " | " .. dist .. " studs"
             end
         end
     end
 
-    if _G.af then myHRP.RotVelocity = Vector3.zero; myHRP.Velocity = Vector3.zero end
-    if _G.ab or _G.afz or _G.aj or _G.av then myHRP.Velocity = Vector3.zero end
-
+    -- Estabilização de Trava (Cage)
     if _G.targ and _G.targ.Character and _G.targ.Character:FindFirstChild("HumanoidRootPart") then
         local tHRP = _G.targ.Character.HumanoidRootPart
         if _G.lg then myHRP.CFrame = tHRP.CFrame * CFrame.new(0, 0, 3) end
         if _G.go then myHRP.CFrame = tHRP.CFrame * CFrame.new(0, 0, 3); _G.go = false end
         
         if _G.sr then
-            myHRP.Velocity = Vector3.zero; myHRP.RotVelocity = Vector3.zero -- ESTABILIZAÇÃO (FIM DO EFEITO DE QUEDA)
-            for _, p in pairs(LP.Character:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = true end end
-            myHRP.CFrame = tHRP.CFrame * CFrame.new(0, 0, 1)
+            myHRP.CFrame = tHRP.CFrame * CFrame.new(0, 0, 0)
+            myHRP.Velocity = Vector3.zero; myHRP.RotVelocity = Vector3.zero
+            if LP.Character.Humanoid then LP.Character.Humanoid.PlatformStand = true end 
         else
-            for _, p in pairs(LP.Character:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end
+            if LP.Character.Humanoid then LP.Character.Humanoid.PlatformStand = false end
         end
     end
 end)
