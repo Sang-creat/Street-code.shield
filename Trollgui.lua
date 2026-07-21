@@ -1,6 +1,6 @@
 --[[
     SCRIPT TROLL GUI UNIVERSAL - DELTA EXECUTOR MOBILE
-    Versão: 2.3 (Integrada com Controle Remoto, Super Ring Defensivo e Tween de Longo Alcance)
+    Versão: 2.4 (Correção da Lista de Jogadores e Layout Mobile)
 --]]
 
 local Players = game:GetService("Players")
@@ -30,8 +30,8 @@ ScreenGui.ResetOnSpawn = false
 -- Frame Principal
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 340, 0, 500)
-MainFrame.Position = UDim2.new(0.5, -170, 0.5, -250)
+MainFrame.Size = UDim2.new(0, 320, 0, 460)
+MainFrame.Position = UDim2.new(0.5, -160, 0.5, -230)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 MainFrame.BackgroundTransparency = 0.1
 MainFrame.BorderSizePixel = 2
@@ -48,7 +48,7 @@ Glow.Parent = MainFrame
 
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 35)
-Title.Text = "[DELTA] TROLL GUI v2.3"
+Title.Text = "[DELTA] TROLL GUI v2.4"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextScaled = true
 Title.BackgroundColor3 = Color3.fromRGB(50, 0, 100)
@@ -68,7 +68,7 @@ CloseBtn.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
 end)
 
--- Container de Scroll
+-- Container de Scroll Principal
 local ScrollContainer = Instance.new("ScrollingFrame")
 ScrollContainer.Size = UDim2.new(1, -10, 1, -45)
 ScrollContainer.Position = UDim2.new(0, 5, 0, 40)
@@ -76,24 +76,22 @@ ScrollContainer.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 ScrollContainer.BackgroundTransparency = 0.5
 ScrollContainer.BorderSizePixel = 0
 ScrollContainer.Parent = MainFrame
-ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
-ScrollContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y
+ScrollContainer.CanvasSize = UDim2.new(0, 0, 2, 0)
 ScrollContainer.ScrollBarThickness = 5
 
 local UILayout = Instance.new("UIListLayout")
 UILayout.Parent = ScrollContainer
-UILayout.Padding = UDim.new(0, 5)
+UILayout.Padding = UDim.new(0, 8)
 UILayout.SortOrder = Enum.SortOrder.LayoutOrder
 
-local function CreateCategory(Name)
+local function CreateCategory(Name, Height)
     local Category = Instance.new("Frame")
-    Category.Size = UDim2.new(1, 0, 0, 0)
+    Category.Size = UDim2.new(1, 0, 0, Height)
     Category.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
     Category.BackgroundTransparency = 0.2
     Category.BorderSizePixel = 1
     Category.BorderColor3 = Color3.fromRGB(80, 80, 150)
     Category.Parent = ScrollContainer
-    Category.AutomaticSize = Enum.AutomaticSize.Y
     
     local TitleLbl = Instance.new("TextLabel")
     TitleLbl.Size = UDim2.new(1, 0, 0, 25)
@@ -105,11 +103,10 @@ local function CreateCategory(Name)
     TitleLbl.Parent = Category
     
     local Content = Instance.new("Frame")
-    Content.Size = UDim2.new(1, -5, 0, 0)
-    Content.Position = UDim2.new(0, 2, 0, 27)
+    Content.Size = UDim2.new(1, -4, 1, -28)
+    Content.Position = UDim2.new(0, 2, 0, 28)
     Content.BackgroundTransparency = 1
     Content.Parent = Category
-    Content.AutomaticSize = Enum.AutomaticSize.Y
     
     local ContentLayout = Instance.new("UIListLayout")
     ContentLayout.Parent = Content
@@ -119,12 +116,12 @@ local function CreateCategory(Name)
     return Content
 end
 
-local TargetContent = CreateCategory("👥 SELECIONAR ALVO")
-local AdminContent = CreateCategory("⚔️ TROLL & COMBATE")
+local TargetContent = CreateCategory("👥 SELECIONAR ALVO", 130)
+local AdminContent = CreateCategory("⚔️ TROLL & COMBATE", 160)
 
--- ==================== LISTA DE JOGADORES ====================
+-- ==================== LISTA DE JOGADORES CORRIGIDA ====================
 local TargetLabel = Instance.new("TextLabel")
-TargetLabel.Size = UDim2.new(1, 0, 0, 25)
+TargetLabel.Size = UDim2.new(1, 0, 0, 22)
 TargetLabel.Text = "Alvo Atual: NENHUM"
 TargetLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
 TargetLabel.TextScaled = true
@@ -132,11 +129,11 @@ TargetLabel.BackgroundTransparency = 1
 TargetLabel.Parent = TargetContent
 
 local PlayerScroll = Instance.new("ScrollingFrame")
-PlayerScroll.Size = UDim2.new(1, 0, 0, 100)
+PlayerScroll.Size = UDim2.new(1, 0, 0, 95)
+PlayerScroll.Position = UDim2.new(0, 0, 0, 25)
 PlayerScroll.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
 PlayerScroll.BorderSizePixel = 0
 PlayerScroll.Parent = TargetContent
-PlayerScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 PlayerScroll.ScrollBarThickness = 4
 
 local PlayerLayout = Instance.new("UIListLayout")
@@ -148,49 +145,51 @@ local function UpdatePlayerList()
         if child:IsA("TextButton") then child:Destroy() end
     end
     
+    local count = 0
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= LocalPlayer then
+            count = count + 1
             local Btn = Instance.new("TextButton")
-            Btn.Size = UDim2.new(1, 0, 0, 25)
-            Btn.Text = "  " + plr.Name
-            Btn.Text = "  " .. plr.Name
+            Btn.Size = UDim2.new(1, -5, 0, 26)
+            Btn.Text = "  " .. plr.Name -- Correção do operador de string
             Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            Btn.TextSize = 13
             Btn.TextXAlignment = Enum.TextXAlignment.Left
             Btn.BackgroundColor3 = Color3.fromRGB(45, 45, 60)
             Btn.Parent = PlayerScroll
             
             Btn.MouseButton1Click:Connect(function()
                 Targets.Player = plr
-                TargetLabel.Text = "Alvo Atual: " .. plr.Name
+                TargetLabel.Text = "Alvo: " .. plr.Name
             end)
         end
     end
-    PlayerScroll.CanvasSize = UDim2.new(0, 0, 0, #Players:GetPlayers() * 27)
+    PlayerScroll.CanvasSize = UDim2.new(0, 0, 0, count * 28)
 end
 
 Players.PlayerAdded:Connect(UpdatePlayerList)
 Players.PlayerRemoving:Connect(UpdatePlayerList)
 UpdatePlayerList()
 
--- Construtor de Toggles
+-- Construtor de Toggles Seguro
 local function CreateToggle(Parent, Label, Default, Callback)
     local Frame = Instance.new("Frame")
-    Frame.Size = UDim2.new(1, 0, 0, 30)
+    Frame.Size = UDim2.new(1, 0, 0, 28)
     Frame.BackgroundTransparency = 1
     Frame.Parent = Parent
     
     local LabelTxt = Instance.new("TextLabel")
     LabelTxt.Size = UDim2.new(0.65, 0, 1, 0)
-    LabelTxt.Text = Label
+    LabelTxt.Text = " " .. Label
     LabelTxt.TextColor3 = Color3.fromRGB(220, 220, 220)
     LabelTxt.TextXAlignment = Enum.TextXAlignment.Left
-    LabelTxt.TextScaled = true
+    LabelTxt.TextSize = 12
     LabelTxt.BackgroundTransparency = 1
     LabelTxt.Parent = Frame
     
     local ToggleBtn = Instance.new("TextButton")
-    ToggleBtn.Size = UDim2.new(0, 60, 0, 25)
-    ToggleBtn.Position = UDim2.new(0.7, 0, 0, 2)
+    ToggleBtn.Size = UDim2.new(0, 55, 0, 22)
+    ToggleBtn.Position = UDim2.new(0.72, 0, 0, 3)
     ToggleBtn.Text = Default and "ON" or "OFF"
     ToggleBtn.TextColor3 = Default and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
     ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
@@ -209,7 +208,6 @@ end
 
 -- ==================== FUNÇÕES TROLL ====================
 
--- 1. FREEZE (Prisão por gaiola estática ao redor do alvo)
 CreateToggle(AdminContent, "🔒 Freeze Alvo", false, function(state)
     if state then
         task.spawn(function()
@@ -243,7 +241,6 @@ CreateToggle(AdminContent, "🔒 Freeze Alvo", false, function(state)
     end
 end)
 
--- 2. ESP BÁSICO
 CreateToggle(AdminContent, "👁️ ESP Jogadores", false, function(state)
     local ESPBoxes = {}
     if state then
@@ -256,8 +253,8 @@ CreateToggle(AdminContent, "👁️ ESP Jogadores", false, function(state)
                         local pos, onScreen = Camera:WorldToScreenPoint(player.Character.HumanoidRootPart.Position)
                         if onScreen then
                             local box = Instance.new("Frame")
-                            box.Size = UDim2.new(0, 40, 0, 60)
-                            box.Position = UDim2.new(0, pos.X - 20, 0, pos.Y - 30)
+                            box.Size = UDim2.new(0, 35, 0, 50)
+                            box.Position = UDim2.new(0, pos.X - 17, 0, pos.Y - 25)
                             box.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
                             box.BackgroundTransparency = 0.7
                             box.Parent = ScreenGui
@@ -272,18 +269,17 @@ CreateToggle(AdminContent, "👁️ ESP Jogadores", false, function(state)
     end
 end)
 
--- 3. SUPER RING DEFENSIVO (Anel de Espada a ~2 Studs para impedir bangs e matar)
-CreateToggle(AdminContent, "💫 Super Ring Defensivo (Espada)", false, function(state)
+CreateToggle(AdminContent, "💫 Super Ring Defensivo", false, function(state)
     if state then
         task.spawn(function()
-            local gearIdDefesa = 268586231 -- ID de uma espada/gear padrão
+            local gearIdDefesa = 268586231
             if AvatarRemote then
                 AvatarRemote:FireServer({["id"] = gearIdDefesa, ["event"] = "equip", ["equiptype"] = "Gear"})
             end
             task.wait(0.5)
             
             local angle = 0
-            while Toggles["💫 Super Ring Defensivo (Espada)"] and Toggles["💫 Super Ring Defensivo (Espada)"].GetState() do
+            while Toggles["💫 Super Ring Defensivo"] and Toggles["💫 Super Ring Defensivo"].GetState() do
                 local char = LocalPlayer.Character
                 if char and char:FindFirstChild("HumanoidRootPart") then
                     local root = char.HumanoidRootPart
@@ -292,21 +288,19 @@ CreateToggle(AdminContent, "💫 Super Ring Defensivo (Espada)", false, function
                     
                     if gearInstance and gearInstance:FindFirstChild("Handle") then
                         local handle = gearInstance.Handle
-                        -- Força o item para o workspace para controle físico livre no anel
                         if gearInstance.Parent ~= Workspace then
                             gearInstance.Parent = Workspace
                         end
                         
                         handle.CanCollide = true
-                        angle = angle + 25 -- Velocidade de rotação alta
+                        angle = angle + 25
                         local rad = math.rad(angle)
-                        local radius = 2 -- Exatamente a 2 Studs de distância do corpo
+                        local radius = 2
                         local x = root.Position.X + math.cos(rad) * radius
                         local z = root.Position.Z + math.sin(rad) * radius
                         
                         handle.CFrame = CFrame.new(Vector3.new(x, root.Position.Y, z), root.Position)
                         
-                        -- Sistema de impacto em quem se aproximar para dar bang/grudar
                         for _, p in ipairs(Players:GetPlayers()) do
                             if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
                                 local pRoot = p.Character.HumanoidRootPart
@@ -320,7 +314,6 @@ CreateToggle(AdminContent, "💫 Super Ring Defensivo (Espada)", false, function
                 task.wait(0.03)
             end
             
-            -- Recoloca na mochila ao desligar
             if AvatarRemote then
                 AvatarRemote:FireServer({["id"] = gearIdDefesa, ["event"] = "unequip", ["equiptype"] = "Gear"})
             end
@@ -328,13 +321,12 @@ CreateToggle(AdminContent, "💫 Super Ring Defensivo (Espada)", false, function
     end
 end)
 
--- 4. ESPADA TELEGUIADA DE LONGO ALCANCE (Com Tween proporcional de 400 em 400 studs e carregamento de mapa)
-CreateToggle(AdminContent, "🚀 Espada Teleguiada (Longo Alcance)", false, function(state)
+CreateToggle(AdminContent, "🚀 Espada Teleguiada", false, function(state)
     if state then
         task.spawn(function()
             local target = Targets.Player
             if not target then
-                print("[!] Nenhum alvo selecionado para a espada de longo alcance.")
+                print("[!] Nenhum alvo selecionado.")
                 return
             end
             
@@ -346,39 +338,28 @@ CreateToggle(AdminContent, "🚀 Espada Teleguiada (Longo Alcance)", false, func
             
             local char = LocalPlayer.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
-            local gearName = "Gear" + gearIdAtaque
             local gearName = "Gear" .. gearIdAtaque
             local gearInstance = char and char:FindFirstChild(gearName)
             
             if root and target.Character and target.Character:FindFirstChild("HumanoidRootPart") and gearInstance and gearInstance:FindFirstChild("Handle") then
                 local handle = gearInstance.Handle
-                gearInstance.Parent = Workspace -- Libera no Workspace para voar livre
+                gearInstance.Parent = Workspace
                 handle.CanCollide = true
                 
                 local targetRoot = target.Character.HumanoidRootPart
                 local distanciaTotal = (root.Position - targetRoot.Position).Magnitude
                 
-                print("[+] Distância calculada até o alvo: " .. math.floor(distanciaTotal) .. " Studs.")
-                
-                -- Algoritmo de blocos de 400 em 400 studs com tempo de espera dinâmico para renderização/carregamento do mapa
                 local blocos = math.ceil(distanciaTotal / 400)
-                local tempoPorBloco = 0.8 -- Segundos estimados por cada bloco de 400 studs para evitar travamento de render
-                local tempoTotalVoo = math.clamp(blocos * tempoPorBloco, 0.5, 12)
+                local tempoTotalVoo = math.clamp(blocos * 0.8, 0.5, 12)
                 
-                -- Executa a interpolação (Tween) de alta precisão
                 local tweenInfo = TweenInfo.new(tempoTotalVoo, Enum.EasingStyle.Linear)
                 local tween = TweenService:Create(handle, tweenInfo, {
                     CFrame = targetRoot.CFrame + Vector3.new(0, 2, 0)
                 })
                 
                 tween:Play()
+                pcall(function() tween.Completed:Wait() end)
                 
-                -- Aguarda a chegada garantindo que o motor processe o trecho percorrido
-                pcall(function()
-                    tween.Completed:Wait()
-                end)
-                
-                -- Impacto físico forçado ao chegar
                 task.wait(0.2)
                 if gearInstance and gearInstance.Parent then
                     gearInstance:Destroy()
@@ -388,4 +369,4 @@ CreateToggle(AdminContent, "🚀 Espada Teleguiada (Longo Alcance)", false, func
     end
 end)
 
-print("[DELTA] Troll GUI v2.3 Carregada com Sucesso!")
+print("[DELTA] Troll GUI v2.4 Carregada com Sucesso!")
