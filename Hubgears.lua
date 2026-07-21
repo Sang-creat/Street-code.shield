@@ -12,7 +12,7 @@ local remote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("AvatarMai
 -- Configuração dos Grupos
 local Groups = {
     {Name = "DEFESA", Color = Color3.fromRGB(52, 152, 219), Gears = {94794847, 236441643, 80661504}, Active = false},
-    {Name = "ESPADAS", Color = Color3.fromRGB(231, 76, 60), Gears = {102705454, 108158379, 1208300505}, Active = false},
+    {Name = "ESPADAS", Color = Color3.fromRGB(231, 76, 60), Gears = {99119240, 93136746, 108158379, 268586231}, Active = false},
     {Name = "1-ATAQUE BÁSICO", Color = Color3.fromRGB(46, 204, 113), Gears = {26017478, 70476425, 1208300505}, Active = false},
     {Name = "2-ATAQUE INDIRETO", Color = Color3.fromRGB(241, 196, 15), Gears = {127506257, 108158379, 70476425}, Active = false},
     {Name = "3-ATAQUE DIRETO OP", Color = Color3.fromRGB(155, 89, 182), Gears = {127506257, 268586231, 1117745433}, Active = false},
@@ -79,7 +79,7 @@ local function startGearsLoop(g)
     end)
 end
 
--- Lógica exata para a Capa (Executa uma única vez por ativação/respawn respeitando o ForceField)
+-- Lógica exata para a Capa (Aguarda o ForceField sumir, espera 0.5s, equipa, espera 2s e desequipa)
 local function executeInvisBug(g)
     task.spawn(function()
         if not g.Active then return end
@@ -96,12 +96,17 @@ local function executeInvisBug(g)
 
         if not g.Active then return end
 
+        -- Conta exatamente 0.5 segundos após o ForceField sumir
+        task.wait(0.5)
+
+        if not g.Active then return end
+
         -- 1. Equipa a capa (aparece na mão com a setinha laranja)
         remote:FireServer({["id"] = g.CapaID, ["event"] = "equip", ["equiptype"] = "Gear"})
         
-        -- 2. Aguarda os 2.5 segundos para você tocar na tela e ativar a invisibilidade
+        -- 2. Aguarda os 2 segundos exigidos com a capa na mão
         local elapsed = 0
-        while elapsed < 2.5 and g.Active do
+        while elapsed < 2.0 and g.Active do
             task.wait(0.1)
             elapsed = elapsed + 0.1
         end
@@ -164,12 +169,7 @@ for i, g in ipairs(Groups) do
             end
         end
         
-        -- Atualiza visualmente todas as chaves da interface
-        for _, otherGroup in ipairs(Groups) do
-            -- Como iteramos pelos grupos, atualizamos os estados visuais correspondentes
-        end
         updateKeyVisual()
-        -- Atualiza os demais botões da tela
     end
 
     btn.MouseButton1Click:Connect(toggleGroupState)
