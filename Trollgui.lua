@@ -1,6 +1,6 @@
 --[[
     SCRIPT TROLL GUI UNIVERSAL - DELTA EXECUTOR MOBILE
-    Versão: 2.4 (Correção da Lista de Jogadores e Layout Mobile)
+    Versão: 2.6 (Correção de Layout da Barra Superior e Fixação Física do Super Ring)
 --]]
 
 local Players = game:GetService("Players")
@@ -14,10 +14,8 @@ local LocalPlayer = Players.LocalPlayer
 local Toggles = {}
 local Targets = {Player = nil}
 
--- Referência do Remote fornecida pelo usuário
 local AvatarRemote = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("AvatarMainRE")
 
--- Remove interface anterior se já existir
 if LocalPlayer.PlayerGui:FindFirstChild("TrollGUI_Mobile") then
     LocalPlayer.PlayerGui.TrollGUI_Mobile:Destroy()
 end
@@ -46,18 +44,31 @@ Glow.Thickness = 2
 Glow.Transparency = 0.5
 Glow.Parent = MainFrame
 
+-- Barra de Título Corrigida (Com espaço livre para os botões)
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 35)
-Title.Text = "[DELTA] TROLL GUI v2.4"
+Title.Size = UDim2.new(1, -75, 0, 35)
+Title.Position = UDim2.new(0, 8, 0, 0)
+Title.Text = "TROLL GUI v2.6"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextScaled = true
+Title.TextSize = 14
+Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.BackgroundColor3 = Color3.fromRGB(50, 0, 100)
-Title.BackgroundTransparency = 0.3
+Title.BackgroundTransparency = 1
 Title.Parent = MainFrame
 
+-- Fundo da Barra Superior
+local TopBarBg = Instance.new("Frame")
+TopBarBg.Size = UDim2.new(1, 0, 0, 35)
+TopBarBg.BackgroundColor3 = Color3.fromRGB(50, 0, 100)
+TopBarBg.BackgroundTransparency = 0.3
+TopBarBg.ZIndex = 0
+TopBarBg.Parent = MainFrame
+
+-- Botão de Fechar (X)
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.new(0, 30, 0, 30)
-CloseBtn.Position = UDim2.new(1, -35, 0, 2)
+CloseBtn.Position = UDim2.new(1, -33, 0, 2)
+CloseBtn.ZIndex = 2
 CloseBtn.Text = "X"
 CloseBtn.TextColor3 = Color3.fromRGB(255, 0, 0)
 CloseBtn.TextScaled = true
@@ -66,6 +77,30 @@ CloseBtn.BackgroundTransparency = 0.3
 CloseBtn.Parent = MainFrame
 CloseBtn.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
+end)
+
+-- Botão de Minimizar (-)
+local MinimizeBtn = Instance.new("TextButton")
+MinimizeBtn.Size = UDim2.new(0, 30, 0, 30)
+MinimizeBtn.Position = UDim2.new(1, -66, 0, 2)
+MinimizeBtn.ZIndex = 2
+MinimizeBtn.Text = "-"
+MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 0)
+MinimizeBtn.TextScaled = true
+MinimizeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+MinimizeBtn.BackgroundTransparency = 0.3
+MinimizeBtn.Parent = MainFrame
+
+local isMinimized = false
+MinimizeBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    for _, child in ipairs(MainFrame:GetChildren()) do
+        if child:IsA("ScrollingFrame") then
+            child.Visible = not isMinimized
+        end
+    end
+    MainFrame.Size = isMinimized and UDim2.new(0, 320, 0, 35) or UDim2.new(0, 320, 0, 460)
+    MinimizeBtn.Text = isMinimized and "+" or "-"
 end)
 
 -- Container de Scroll Principal
@@ -117,9 +152,9 @@ local function CreateCategory(Name, Height)
 end
 
 local TargetContent = CreateCategory("👥 SELECIONAR ALVO", 130)
-local AdminContent = CreateCategory("⚔️ TROLL & COMBATE", 160)
+local AdminContent = CreateCategory("⚔️ TROLL & COMBATE", 180)
 
--- ==================== LISTA DE JOGADORES CORRIGIDA ====================
+-- ==================== LISTA DE JOGADORES ====================
 local TargetLabel = Instance.new("TextLabel")
 TargetLabel.Size = UDim2.new(1, 0, 0, 22)
 TargetLabel.Text = "Alvo Atual: NENHUM"
@@ -151,7 +186,7 @@ local function UpdatePlayerList()
             count = count + 1
             local Btn = Instance.new("TextButton")
             Btn.Size = UDim2.new(1, -5, 0, 26)
-            Btn.Text = "  " .. plr.Name -- Correção do operador de string
+            Btn.Text = "  " .. plr.Name
             Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
             Btn.TextSize = 13
             Btn.TextXAlignment = Enum.TextXAlignment.Left
@@ -171,7 +206,6 @@ Players.PlayerAdded:Connect(UpdatePlayerList)
 Players.PlayerRemoving:Connect(UpdatePlayerList)
 UpdatePlayerList()
 
--- Construtor de Toggles Seguro
 local function CreateToggle(Parent, Label, Default, Callback)
     local Frame = Instance.new("Frame")
     Frame.Size = UDim2.new(1, 0, 0, 28)
@@ -208,67 +242,76 @@ end
 
 -- ==================== FUNÇÕES TROLL ====================
 
-CreateToggle(AdminContent, "🔒 Freeze Alvo", false, function(state)
+CreateToggle(AdminContent, "🔒 Freeze Alvo (Real)", false, function(state)
     if state then
         task.spawn(function()
-            local jailParts = {}
-            while Toggles["🔒 Freeze Alvo"] and Toggles["🔒 Freeze Alvo"].GetState() do
+            local lockedPos = nil
+            while Toggles["🔒 Freeze Alvo (Real)"] and Toggles["🔒 Freeze Alvo (Real)"].GetState() do
                 local target = Targets.Player
                 if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-                    local pos = target.Character.HumanoidRootPart.Position
-                    if #jailParts == 0 then
-                        for i = 1, 5 do
-                            local p = Instance.new("Part")
-                            p.Size = Vector3.new(6, 6, 6)
-                            p.Anchored = true
-                            p.Transparency = 0.8
-                            p.BrickColor = BrickColor.new("Bright red")
-                            p.CanCollide = true
-                            p.Parent = Workspace
-                            table.insert(jailParts, p)
-                        end
-                    end
-                    jailParts[1].Position = pos + Vector3.new(0, -3, 0)
-                    jailParts[2].Position = pos + Vector3.new(4, 0, 0)
-                    jailParts[3].Position = pos + Vector3.new(-4, 0, 0)
-                    jailParts[4].Position = pos + Vector3.new(0, 0, 4)
-                    jailParts[5].Position = pos + Vector3.new(0, 0, -4)
+                    local root = target.Character.HumanoidRootPart
+                    local humanoid = target.Character:FindFirstChildOfClass("Humanoid")
+                    
+                    if not lockedPos then lockedPos = root.CFrame end
+                    root.CFrame = lockedPos
+                    root.Velocity = Vector3.new(0, 0, 0)
+                    if humanoid then humanoid.PlatformStand = true end
+                else
+                    lockedPos = nil
                 end
-                task.wait(0.2)
+                task.wait(0.05)
             end
-            for _, p in ipairs(jailParts) do p:Destroy() end
+            local target = Targets.Player
+            if target and target.Character then
+                local humanoid = target.Character:FindFirstChildOfClass("Humanoid")
+                if humanoid then humanoid.PlatformStand = false end
+            end
         end)
     end
 end)
 
-CreateToggle(AdminContent, "👁️ ESP Jogadores", false, function(state)
-    local ESPBoxes = {}
+CreateToggle(AdminContent, "👁️ ESP Completo", false, function(state)
+    local ESPData = {}
     if state then
         task.spawn(function()
-            while Toggles["👁️ ESP Jogadores"] and Toggles["👁️ ESP Jogadores"].GetState() do
-                for _, box in pairs(ESPBoxes) do if box then box:Destroy() end end
-                ESPBoxes = {}
+            while Toggles["👁️ ESP Completo"] and Toggles["👁️ ESP Completo"].GetState() do
+                for _, obj in pairs(ESPData) do if obj then obj:Destroy() end end
+                ESPData = {}
+                
                 for _, player in ipairs(Players:GetPlayers()) do
                     if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                        local pos, onScreen = Camera:WorldToScreenPoint(player.Character.HumanoidRootPart.Position)
+                        local char = player.Character
+                        local root = char.HumanoidRootPart
+                        local humanoid = char:FindFirstChildOfClass("Humanoid")
+                        
+                        local pos, onScreen = Camera:WorldToScreenPoint(root.Position)
+                        local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                        local dist = myRoot and math.floor((root.Position - myRoot.Position).Magnitude) or 0
+                        local hp = humanoid and math.floor(humanoid.Health) or 0
+                        local maxHp = humanoid and math.floor(humanoid.MaxHealth) or 100
+                        
                         if onScreen then
-                            local box = Instance.new("Frame")
-                            box.Size = UDim2.new(0, 35, 0, 50)
-                            box.Position = UDim2.new(0, pos.X - 17, 0, pos.Y - 25)
-                            box.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-                            box.BackgroundTransparency = 0.7
-                            box.Parent = ScreenGui
-                            table.insert(ESPBoxes, box)
+                            local infoLbl = Instance.new("TextLabel")
+                            infoLbl.Size = UDim2.new(0, 140, 0, 45)
+                            infoLbl.Position = UDim2.new(0, pos.X - 70, 0, pos.Y - 50)
+                            infoLbl.BackgroundTransparency = 0.5
+                            infoLbl.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+                            infoLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+                            infoLbl.TextSize = 11
+                            infoLbl.Text = string.format("%s\nDist: %d studs\nHP: %d/%d", player.Name, dist, hp, maxHp)
+                            infoLbl.Parent = ScreenGui
+                            table.insert(ESPData, infoLbl)
                         end
                     end
                 end
                 task.wait(0.1)
             end
-            for _, box in pairs(ESPBoxes) do if box then box:Destroy() end end
+            for _, obj in pairs(ESPData) do if obj then obj:Destroy() end end
         end)
     end
 end)
 
+-- SUPER RING CORRIGIDO (Ancorado temporariamente para não cair no chão)
 CreateToggle(AdminContent, "💫 Super Ring Defensivo", false, function(state)
     if state then
         task.spawn(function()
@@ -292,26 +335,35 @@ CreateToggle(AdminContent, "💫 Super Ring Defensivo", false, function(state)
                             gearInstance.Parent = Workspace
                         end
                         
+                        -- Trava a física para flutuar sem cair no chão
+                        handle.Anchored = true
                         handle.CanCollide = true
-                        angle = angle + 25
+                        
+                        angle = angle + 30
                         local rad = math.rad(angle)
                         local radius = 2
                         local x = root.Position.X + math.cos(rad) * radius
                         local z = root.Position.Z + math.sin(rad) * radius
                         
-                        handle.CFrame = CFrame.new(Vector3.new(x, root.Position.Y, z), root.Position)
+                        handle.CFrame = CFrame.new(Vector3.new(x, root.Position.Y + 0.5, z), root.Position)
                         
                         for _, p in ipairs(Players:GetPlayers()) do
                             if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
                                 local pRoot = p.Character.HumanoidRootPart
                                 if (pRoot.Position - handle.Position).Magnitude < 3.5 then
-                                    pRoot.Velocity = (pRoot.Position - root.Position).Unit * 70 + Vector3.new(0, 30, 0)
+                                    pRoot.Velocity = (pRoot.Position - root.Position).Unit * 80 + Vector3.new(0, 35, 0)
                                 end
                             end
                         end
                     end
                 end
-                task.wait(0.03)
+                task.wait(0.02)
+            end
+            
+            -- Desancora antes de devolver para evitar bugs de inventário
+            local gearInstance = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Gear" .. gearIdDefesa) or Workspace:FindFirstChild("Gear" .. gearIdDefesa)
+            if gearInstance and gearInstance:FindFirstChild("Handle") then
+                gearInstance.Handle.Anchored = false
             end
             
             if AvatarRemote then
@@ -321,52 +373,60 @@ CreateToggle(AdminContent, "💫 Super Ring Defensivo", false, function(state)
     end
 end)
 
-CreateToggle(AdminContent, "🚀 Espada Teleguiada", false, function(state)
+-- ESPADA TELEGUIADA EM LOOP CORRIGIDA
+CreateToggle(AdminContent, "🚀 Espada Teleguiada (Loop)", false, function(state)
     if state then
         task.spawn(function()
-            local target = Targets.Player
-            if not target then
-                print("[!] Nenhum alvo selecionado.")
-                return
-            end
-            
             local gearIdAtaque = 268586231
-            if AvatarRemote then
-                AvatarRemote:FireServer({["id"] = gearIdAtaque, ["event"] = "equip", ["equiptype"] = "Gear"})
-            end
-            task.wait(0.6)
             
-            local char = LocalPlayer.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
-            local gearName = "Gear" .. gearIdAtaque
-            local gearInstance = char and char:FindFirstChild(gearName)
-            
-            if root and target.Character and target.Character:FindFirstChild("HumanoidRootPart") and gearInstance and gearInstance:FindFirstChild("Handle") then
-                local handle = gearInstance.Handle
-                gearInstance.Parent = Workspace
-                handle.CanCollide = true
-                
-                local targetRoot = target.Character.HumanoidRootPart
-                local distanciaTotal = (root.Position - targetRoot.Position).Magnitude
-                
-                local blocos = math.ceil(distanciaTotal / 400)
-                local tempoTotalVoo = math.clamp(blocos * 0.8, 0.5, 12)
-                
-                local tweenInfo = TweenInfo.new(tempoTotalVoo, Enum.EasingStyle.Linear)
-                local tween = TweenService:Create(handle, tweenInfo, {
-                    CFrame = targetRoot.CFrame + Vector3.new(0, 2, 0)
-                })
-                
-                tween:Play()
-                pcall(function() tween.Completed:Wait() end)
-                
-                task.wait(0.2)
-                if gearInstance and gearInstance.Parent then
-                    gearInstance:Destroy()
+            while Toggles["🚀 Espada Teleguiada (Loop)"] and Toggles["🚀 Espada Teleguiada (Loop)"].GetState() do
+                local target = Targets.Player
+                if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+                    if AvatarRemote then
+                        AvatarRemote:FireServer({["id"] = gearIdAtaque, ["event"] = "equip", ["equiptype"] = "Gear"})
+                    end
+                    task.wait(0.6)
+                    
+                    local char = LocalPlayer.Character
+                    local root = char and char:FindFirstChild("HumanoidRootPart")
+                    local gearName = "Gear" .. gearIdAtaque
+                    local gearInstance = char and (char:FindFirstChild(gearName) or LocalPlayer.Backpack:FindFirstChild(gearName))
+                    
+                    if root and gearInstance then
+                        if gearInstance.Parent == LocalPlayer.Backpack then
+                            gearInstance.Parent = char
+                        end
+                        local handle = gearInstance:FindFirstChild("Handle")
+                        if handle then
+                            gearInstance.Parent = Workspace
+                            handle.Anchored = false
+                            handle.CanCollide = true
+                            
+                            local targetRoot = target.Character.HumanoidRootPart
+                            local distanciaTotal = (root.Position - targetRoot.Position).Magnitude
+                            
+                            local blocos = math.ceil(distanciaTotal / 400)
+                            local tempoVoo = math.clamp(blocos * 0.7, 0.4, 10)
+                            
+                            local tweenInfo = TweenInfo.new(tempoVoo, Enum.EasingStyle.Linear)
+                            local tween = TweenService:Create(handle, tweenInfo, {
+                                CFrame = targetRoot.CFrame + Vector3.new(0, 2, 0)
+                            })
+                            
+                            tween:Play()
+                            pcall(function() tween.Completed:Wait() end)
+                            
+                            task.wait(0.2)
+                            if gearInstance and gearInstance.Parent then
+                                gearInstance:Destroy()
+                            end
+                        end
+                    end
                 end
+                task.wait(1.5)
             end
         end)
     end
 end)
 
-print("[DELTA] Troll GUI v2.4 Carregada com Sucesso!")
+print("[DELTA] Troll GUI v2.6 Carregada com Sucesso!")
