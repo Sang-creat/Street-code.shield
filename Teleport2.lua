@@ -1,51 +1,89 @@
-local Players, RunService, TweenService = game:GetService("Players"), game:GetService("RunService"), game:GetService("TweenService")
+--[[
+    SCRIPT DE TELEPORTE MOBILE - COMPLETO E CORRIGIDO
+    Com Waypoints de Longa Distância e LoopGoto Estável
+--]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local lp = Players.LocalPlayer
 
-local Gui = Instance.new("ScreenGui", (pcall(function() return game:GetService("CoreGui") end) and game:GetService("CoreGui") or lp:WaitForChild("PlayerGui")))
+local CoreGui = game:GetService("CoreGui")
+local parentGui = (pcall(function() return CoreGui:IsA("GuiService") end) and CoreGui) or lp:WaitForChild("PlayerGui")
+
+-- Remove GUI anterior se já existir
+if parentGui:FindFirstChild("TeleportGUI") then
+    parentGui.TeleportGUI:Destroy()
+end
+
+local Gui = Instance.new("ScreenGui", parentGui)
 Gui.Name, Gui.ResetOnSpawn = "TeleportGUI", false
 
 local Main = Instance.new("Frame", Gui)
-Main.Size, Main.Position, Main.BackgroundColor3, Main.Draggable, Main.Active = UDim2.new(0, 240, 0, 340), UDim2.new(0.5, -120, 0.5, -170), Color3.fromRGB(30, 30, 30), true, true
-Instance.new("UICorner", Main)
+Main.Size = UDim2.new(0, 260, 0, 380)
+Main.Position = UDim2.new(0.5, -130, 0.5, -190)
+Main.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+Main.Draggable = true
+Main.Active = true
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 8)
+
+local Stroke = Instance.new("UIStroke", Main)
+Stroke.Color = Color3.fromRGB(100, 0, 255)
+Stroke.Thickness = 2
 
 local Title = Instance.new("TextLabel", Main)
-Title.Size, Title.BackgroundColor3, Title.Text, Title.TextColor3, Title.Font = UDim2.new(1, 0, 0, 35), Color3.fromRGB(45, 45, 45), "Menu de Teleporte", Color3.new(1, 1, 1), Enum.Font.SourceSansBold
+Title.Size = UDim2.new(1, 0, 0, 35)
+Title.BackgroundColor3 = Color3.fromRGB(45, 0, 90)
+Title.Text = "Menu de Teleporte"
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 16
+Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 8)
 
+-- Estados
 local gotoEnabled = true
 local loopGotoEnabled = false
 local activeLoopTarget = nil
 local loopConnection = nil
 
--- Função de Teleporte por Múltiplos Saltos (Waypoints para distâncias longas)
+-- Função de Teleporte por Múltiplos Saltos (Waypoints para longas distâncias)
 local function multiStepTeleport(targetCF)
     local char = lp.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then return end
 
-    local noclip = RunService.Stepped:Connect(function()
-        for _, p in ipairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end
+    -- Desativa colisão temporariamente para passar por paredes e mapas distantes
+    local noclipConn = RunService.Stepped:Connect(function()
+        for _, p in ipairs(char:GetDescendants()) do 
+            if p:IsA("BasePart") then p.CanCollide = false end 
+        end
     end)
 
-    local startPos, targetPos = root.Position, targetCF.Position
-    local steps = math.ceil((targetPos - startPos).Magnitude / 400)
+    local startPos = root.Position
+    local targetPos = targetCF.Position
+    local distance = (targetPos - startPos).Magnitude
 
-    for i = 1, steps do
-        local intermediatePos = startPos:Lerp(targetPos, i / steps)
-        local tween = TweenService:Create(root, TweenInfo.new((root.Position - intermediatePos).Magnitude / 400, Enum.EasingStyle.Linear), {CFrame = CFrame.new(intermediatePos) * (targetCF - targetPos)})
-        tween:Play()
-        tween.Completed:Wait()
+    -- Se a distância for grande (mais de 500 studs), divide em saltos lineares seguros
+    if distance > 500 then
+        local steps = math.ceil(distance / 400)
+        for i = 1, steps do
+            local intermediatePos = startPos:Lerp(targetPos, i / steps)
+            root.CFrame = CFrame.new(intermediatePos)
+            task.wait(0.05) -- Pausa curta para carregar o mapa no caminho
+        end
+    else
+        root.CFrame = targetCF
     end
-    noclip:Disconnect()
+
+    task.wait(0.05)
+    noclipConn:Disconnect()
 end
 
--- Função para iniciar/gerenciar o loop nas costas com aproximação suave
+-- Gerenciador do LoopGoto nas costas (Instantâneo para acompanhar o alvo)
 local function startLoopGoto(targetPlr)
     if loopConnection then loopConnection:Disconnect() end
     
-    -- Aproximação inicial suave caso esteja longe
     if targetPlr.Character and targetPlr.Character:FindFirstChild("HumanoidRootPart") then
-        local backCF = targetPlr.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 1)
-        multiStepTeleport(backCF)
+        multiStepTeleport(targetPlr.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 2))
     end
     
     loopConnection = RunService.Heartbeat:Connect(function()
@@ -58,74 +96,109 @@ local function startLoopGoto(targetPlr)
         local targetRoot = activeLoopTarget.Character:FindFirstChild("HumanoidRootPart")
 
         if root and targetRoot then
-            for _, p in ipairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end
-            -- Mantém grudado nas costas a 1 stud de distância de forma contínua
-            root.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 1)
+            for _, p in ipairs(char:GetDescendants()) do 
+                if p:IsA("BasePart") then p.CanCollide = false end 
+            end
+            -- Grudado perfeitamente nas costas do jogador alvo
+            root.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 2)
         end
     end)
 end
 
-local function createToggle(name, posX, defaultState, callback)
-    local btn = Instance.new("TextButton", Main)
-    btn.Size, btn.Position, btn.BackgroundColor3, btn.Text, btn.TextColor3, btn.Font = UDim2.new(0, 110, 0, 25), posX, Color3.fromRGB(50, 50, 50), "", Color3.new(1, 1, 1), Enum.Font.SourceSans
-    local label = Instance.new("TextLabel", btn)
-    label.Size, label.BackgroundTransparency, label.TextColor3, label.TextSize = UDim2.new(1, 0, 1, 0), true, Color3.new(1, 1, 1), 12
+-- Container Superior para os Botões de Alternância (Organizados lado a lado sem sobreposição)
+local TopContainer = Instance.new("Frame", Main)
+TopContainer.Size = UDim2.new(1, -16, 0, 35)
+TopContainer.Position = UDim2.new(0, 8, 0, 42)
+TopContainer.BackgroundTransparency = 1
+
+local TopLayout = Instance.new("UIListLayout", TopContainer)
+TopLayout.FillDirection = Enum.FillDirection.Horizontal
+TopLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+TopLayout.Padding = UDim.new(0, 10)
+
+-- Função para criar os Botões de Toggle
+local function createToggle(name, defaultState, callback)
+    local btn = Instance.new("TextButton", TopContainer)
+    btn.Size = UDim2.new(0.47, 0, 1, 0)
+    btn.BackgroundColor3 = defaultState and Color3.fromRGB(0, 120, 0) or Color3.fromRGB(120, 0, 0)
+    btn.Text = name .. ": " .. (defaultState and "LIGADO" or "DESLIGADO")
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 11
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
     
     local state = defaultState
-    local function update()
-        label.Text = name .. ": " .. (state and "LIGADO" or "DESLIGADO")
-        btn.BackgroundColor3 = state and Color3.fromRGB(0, 120, 0) or Color3.fromRGB(120, 0, 0)
-    end
-    update()
-    
     btn.MouseButton1Click:Connect(function()
         state = not state
-        update()
+        btn.Text = name .. ": " .. (state and "LIGADO" or "DESLIGADO")
+        btn.BackgroundColor3 = state and Color3.fromRGB(0, 120, 0) or Color3.fromRGB(120, 0, 0)
         callback(state)
     end)
     return btn
 end
 
-createToggle("Goto", UDim2.new(0, 5, 0, 40), true, function(state) gotoEnabled = state end)
-createToggle("LoopGoto", UDim2.new(0, 125, 0, 40), false, function(state) 
+createToggle("Goto", true, function(state) 
+    gotoEnabled = state 
+end)
+
+createToggle("LoopGoto", false, function(state) 
     loopGotoEnabled = state
     if not state then
         activeLoopTarget = nil
         if loopConnection then loopConnection:Disconnect() loopConnection = nil end
-    else
-        if activeLoopTarget then startLoopGoto(activeLoopTarget) end
     end
 end)
 
+-- Scroll de Jogadores
 local Scroll = Instance.new("ScrollingFrame", Main)
-Scroll.Size, Scroll.Position, Scroll.BackgroundTransparency, Scroll.ScrollBarThickness = UDim2.new(1, -10, 1, -75), UDim2.new(0, 5, 0, 70), true, 6
-Instance.new("UIListLayout", Scroll).Padding = UDim.new(0, 4)
+Scroll.Size = UDim2.new(1, -16, 1, -85)
+Scroll.Position = UDim2.new(0, 8, 0, 82)
+Scroll.BackgroundTransparency = 1
+Scroll.ScrollBarThickness = 4
+
+local ScrollLayout = Instance.new("UIListLayout", Scroll)
+ScrollLayout.Padding = UDim.new(0, 5)
+ScrollLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
 local updateList
 
 updateList = function()
-    for _, c in ipairs(Scroll:GetChildren()) do if c:IsA("Frame") then c:Destroy() end end
+    for _, c in ipairs(Scroll:GetChildren()) do 
+        if c:IsA("Frame") then c:Destroy() end 
+    end
     
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= lp then
             local ItemFrame = Instance.new("Frame", Scroll)
-            ItemFrame.Size, ItemFrame.BackgroundTransparency = UDim2.new(1, -6, 0, 30), true
+            ItemFrame.Size = UDim2.new(1, 0, 0, 36)
+            ItemFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+            Instance.new("UICorner", ItemFrame).CornerRadius = UDim.new(0, 6)
 
+            -- Botão do Nome do Jogador (Teleporta usando Waypoints se estiver longe)
             local Btn = Instance.new("TextButton", ItemFrame)
-            Btn.Size, Btn.Position, Btn.BackgroundColor3, Btn.Text, Btn.TextColor3 = UDim2.new(1, -35, 1, 0), UDim2.new(0, 0, 0, 0), Color3.fromRGB(50, 50, 50), plr.Name, Color3.new(1, 1, 1)
-            Instance.new("UICorner", Btn)
+            Btn.Size = UDim2.new(1, -40, 1, 0)
+            Btn.Position = UDim2.new(0, 0, 0, 0)
+            Btn.BackgroundTransparency = 1
+            Btn.Text = "  " .. plr.Name
+            Btn.TextColor3 = Color3.new(1, 1, 1)
+            Btn.Font = Enum.Font.SourceSans
+            Btn.TextSize = 14
+            Btn.TextXAlignment = Enum.TextXAlignment.Left
 
+            -- Círculo / Botão de Seleção do LoopGoto
             local Circle = Instance.new("TextButton", ItemFrame)
-            Circle.Size, Circle.Position, Circle.BackgroundColor3, Circle.Text, Circle.TextColor3 = UDim2.new(0, 30, 1, 0), UDim2.new(1, -30, 0, 0), Color3.fromRGB(40, 40, 40), "", Color3.new(1, 1, 1)
-            Circle.Visible = loopGotoEnabled
+            Circle.Size = UDim2.new(0, 30, 0, 30)
+            Circle.Position = UDim2.new(1, -33, 0.5, -15)
+            Circle.BackgroundColor3 = Color3.fromRGB(60, 60, 75)
+            Circle.Text = (activeLoopTarget == plr) and "✅" or ""
+            Circle.TextColor3 = Color3.new(1, 1, 1)
+            Circle.TextSize = 12
             Instance.new("UICorner", Circle).CornerRadius = UDim.new(1, 0)
-
-            Circle.Text = (loopGotoEnabled and activeLoopTarget == plr) and "✅" or ""
 
             Btn.MouseButton1Click:Connect(function()
                 local tChar = plr.Character
                 if tChar and tChar:FindFirstChild("HumanoidRootPart") then
-                    local backCF = tChar.HumanoidRootPart.CFrame * CFrame.new(0, 0, 1)
+                    local backCF = tChar.HumanoidRootPart.CFrame * CFrame.new(0, 0, 2)
                     
                     if loopGotoEnabled then
                         activeLoopTarget = plr
@@ -151,16 +224,8 @@ updateList = function()
             end)
         end
     end
-    Scroll.CanvasSize = UDim2.new(0, 0, 0, #Players:GetPlayers() * 34)
+    Scroll.CanvasSize = UDim2.new(0, 0, 0, #Players:GetPlayers() * 41)
 end
-
-lp.CharacterAdded:Connect(function(newChar)
-    newChar:WaitForChild("HumanoidRootPart")
-    task.wait(0.5)
-    if loopGotoEnabled and activeLoopTarget then
-        startLoopGoto(activeLoopTarget)
-    end
-end)
 
 Players.PlayerAdded:Connect(updateList)
 Players.PlayerRemoving:Connect(updateList)
