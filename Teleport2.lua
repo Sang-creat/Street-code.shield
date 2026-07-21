@@ -1,14 +1,15 @@
 --[[
-    SCRIPT DE TELEPORTE MOBILE - COMPLETO E CORRIGIDO
-    Com Waypoints de Longa Distância e LoopGoto Estável
+    SCRIPT DE TELEPORTE MOBILE - DEFINITIVO (Com Interpolação de Longa Distância)
+    Otimizado para Delta Executor
 --]]
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local lp = Players.LocalPlayer
+local TweenService = game:GetService("TweenService")
+local localPlayer = Players.LocalPlayer
 
 local CoreGui = game:GetService("CoreGui")
-local parentGui = (pcall(function() return CoreGui:IsA("GuiService") end) and CoreGui) or lp:WaitForChild("PlayerGui")
+local parentGui = (pcall(function() return CoreGui:IsA("GuiService") end) and CoreGui) or localPlayer:WaitForChild("PlayerGui")
 
 -- Remove GUI anterior se já existir
 if parentGui:FindFirstChild("TeleportGUI") then
@@ -39,73 +40,54 @@ Title.Font = Enum.Font.SourceSansBold
 Title.TextSize = 16
 Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 8)
 
--- Estados
+-- Estados das Chaves
 local gotoEnabled = true
 local loopGotoEnabled = false
 local activeLoopTarget = nil
 local loopConnection = nil
 
--- Função de Teleporte por Múltiplos Saltos (Waypoints para longas distâncias)
-local function multiStepTeleport(targetCF)
-    local char = lp.Character
+-- Função de Teleporte por Interpolação (Tween + Noclip para longas distâncias / 3000+ studs)
+local function tweenTeleportTo(targetCFrame)
+    local char = localPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then return end
 
-    -- Desativa colisão temporariamente para passar por paredes e mapas distantes
-    local noclipConn = RunService.Stepped:Connect(function()
+    -- Desativa colisão para atravessar o mapa com segurança durante a interpolação
+    local noclip = RunService.Stepped:Connect(function()
         for _, p in ipairs(char:GetDescendants()) do 
             if p:IsA("BasePart") then p.CanCollide = false end 
         end
     end)
 
-    local startPos = root.Position
-    local targetPos = targetCF.Position
-    local distance = (targetPos - startPos).Magnitude
+    local distance = (root.Position - targetCFrame.Position).Magnitude
+    local tweenTime = distance / 400 -- Velocidade baseada na lógica que funcionou
 
-    -- Se a distância for grande (mais de 500 studs), divide em saltos lineares seguros
-    if distance > 500 then
-        local steps = math.ceil(distance / 400)
-        for i = 1, steps do
-            local intermediatePos = startPos:Lerp(targetPos, i / steps)
-            root.CFrame = CFrame.new(intermediatePos)
-            task.wait(0.05) -- Pausa curta para carregar o mapa no caminho
-        end
-    else
-        root.CFrame = targetCF
-    end
-
-    task.wait(0.05)
-    noclipConn:Disconnect()
+    local tween = TweenService:Create(root, TweenInfo.new(tweenTime, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
+    tween:Play()
+    tween.Completed:Wait()
+    
+    noclip:Disconnect()
 end
 
--- Gerenciador do LoopGoto nas costas (Instantâneo para acompanhar o alvo)
+-- Gerenciador do LoopGoto (Repete o teleporte por interpolação periodicamente para o alvo selecionado)
 local function startLoopGoto(targetPlr)
     if loopConnection then loopConnection:Disconnect() end
-    
-    if targetPlr.Character and targetPlr.Character:FindFirstChild("HumanoidRootPart") then
-        multiStepTeleport(targetPlr.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 2))
-    end
     
     loopConnection = RunService.Heartbeat:Connect(function()
         if not loopGotoEnabled or not activeLoopTarget or not activeLoopTarget.Character or not activeLoopTarget.Character:FindFirstChild("HumanoidRootPart") then
             return
         end
 
-        local char = lp.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        local targetRoot = activeLoopTarget.Character:FindFirstChild("HumanoidRootPart")
-
-        if root and targetRoot then
-            for _, p in ipairs(char:GetDescendants()) do 
-                if p:IsA("BasePart") then p.CanCollide = false end 
-            end
-            -- Grudado perfeitamente nas costas do jogador alvo
-            root.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 2)
+        local tChar = activeLoopTarget.Character
+        local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
+        if tRoot then
+            tweenTeleportTo(tRoot.CFrame + Vector3.new(0, 3, 0))
+            task.wait(1.5) -- Pausa antes de checar/executar o próximo ciclo do loop
         end
     end)
 end
 
--- Container Superior para os Botões de Alternância (Organizados lado a lado sem sobreposição)
+-- Container Superior para os Botões de Alternância
 local TopContainer = Instance.new("Frame", Main)
 TopContainer.Size = UDim2.new(1, -16, 0, 35)
 TopContainer.Position = UDim2.new(0, 8, 0, 42)
@@ -116,7 +98,7 @@ TopLayout.FillDirection = Enum.FillDirection.Horizontal
 TopLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 TopLayout.Padding = UDim.new(0, 10)
 
--- Função para criar os Botões de Toggle
+-- Função para criar os Botões de Toggle (Goto e LoopGoto visíveis)
 local function createToggle(name, defaultState, callback)
     local btn = Instance.new("TextButton", TopContainer)
     btn.Size = UDim2.new(0.47, 0, 1, 0)
@@ -168,13 +150,13 @@ updateList = function()
     end
     
     for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= lp then
+        if plr ~= localPlayer then
             local ItemFrame = Instance.new("Frame", Scroll)
             ItemFrame.Size = UDim2.new(1, 0, 0, 36)
             ItemFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
             Instance.new("UICorner", ItemFrame).CornerRadius = UDim.new(0, 6)
 
-            -- Botão do Nome do Jogador (Teleporta usando Waypoints se estiver longe)
+            -- Botão do Nome do Jogador (Executa o Teleporte por Interpolação)
             local Btn = Instance.new("TextButton", ItemFrame)
             Btn.Size = UDim2.new(1, -40, 1, 0)
             Btn.Position = UDim2.new(0, 0, 0, 0)
@@ -198,14 +180,14 @@ updateList = function()
             Btn.MouseButton1Click:Connect(function()
                 local tChar = plr.Character
                 if tChar and tChar:FindFirstChild("HumanoidRootPart") then
-                    local backCF = tChar.HumanoidRootPart.CFrame * CFrame.new(0, 0, 2)
+                    local targetCFrame = tChar.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
                     
                     if loopGotoEnabled then
                         activeLoopTarget = plr
                         startLoopGoto(plr)
                         updateList()
                     elseif gotoEnabled then
-                        multiStepTeleport(backCF)
+                        tweenTeleportTo(targetCFrame)
                     end
                 end
             end)
