@@ -1,8 +1,15 @@
 local Players, RunService, TweenService = game:GetService("Players"), game:GetService("RunService"), game:GetService("TweenService")
 local localPlayer = Players.LocalPlayer
 
--- Criação da GUI e Janela Principal
-local ScreenGui = Instance.new("ScreenGui", (pcall(function() return game:GetService("CoreGui") end) and game:GetService("CoreGui") or localPlayer:WaitForChild("PlayerGui")))
+local CoreGui = game:GetService("CoreGui")
+local parentGui = (pcall(function() return CoreGui:IsA("GuiService") end) and CoreGui) or localPlayer:WaitForChild("PlayerGui")
+
+-- Remove GUI anterior para evitar duplicidade e bugs de execução
+if parentGui:FindFirstChild("TeleportGUI") then
+    parentGui.TeleportGUI:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui", parentGui)
 ScreenGui.Name, ScreenGui.ResetOnSpawn = "TeleportGUI", false
 
 local Main = Instance.new("Frame", ScreenGui)
@@ -16,6 +23,7 @@ Title.Size, Title.BackgroundColor3, Title.Text, Title.TextColor3, Title.Font = U
 local loopGotoEnabled = false
 local activeLoopTarget = nil
 local loopTask = nil
+local isTeleporting = false
 
 -- Container de Botões de Alternância (Topo)
 local TopContainer = Instance.new("Frame", Main)
@@ -48,14 +56,20 @@ Scroll.Size, Scroll.Position, Scroll.BackgroundTransparency, Scroll.ScrollBarThi
 local Layout = Instance.new("UIListLayout", Scroll)
 Layout.Padding = UDim.new(0, 4)
 
--- Função de Teleporte em Passos (Tween + Noclip de Longo Alcance)
+-- Função de Teleporte em Passos Segura (Evita sobreposição de instâncias)
 local function tweenTeleportTo(targetCFrame)
     local char = localPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
-    if not root then return end
+    if not root or isTeleporting then return end
+
+    isTeleporting = true
 
     local noclip = RunService.Stepped:Connect(function()
-        for _, p in ipairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end
+        if char and char.Parent then
+            for _, p in ipairs(char:GetDescendants()) do 
+                if p:IsA("BasePart") then p.CanCollide = false end 
+            end
+        end
     end)
 
     local distance = (root.Position - targetCFrame.Position).Magnitude
@@ -63,8 +77,13 @@ local function tweenTeleportTo(targetCFrame)
 
     local tween = TweenService:Create(root, TweenInfo.new(tweenTime, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
     tween:Play()
-    tween.Completed:Wait()
-    noclip:Disconnect()
+    
+    pcall(function()
+        tween.Completed:Wait()
+    end)
+
+    if noclip then noclip:Disconnect() end
+    isTeleporting = false
 end
 
 -- Gerenciador do LoopGoto Seguro
@@ -84,7 +103,9 @@ end
 
 -- Atualizar Lista de Jogadores Dinamicamente
 local function updateList()
-    for _, child in ipairs(Scroll:GetChildren()) do if child:IsA("Frame") then child:Destroy() end end
+    for _, child in ipairs(Scroll:GetChildren()) do 
+        if child:IsA("Frame") then child:Destroy() end 
+    end
     
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= localPlayer then
