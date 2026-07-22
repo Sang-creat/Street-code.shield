@@ -1,6 +1,6 @@
 --[[
     SCRIPT TROLL GUI UNIVERSAL - DELTA EXECUTOR MOBILE
-    Versão: 2.6 (Correção de Layout da Barra Superior e Fixação Física do Super Ring)
+    Versão: 2.9 (Super Ring com Input de Distância, Velocidade 15 e Freeze por Objeto Físico)
 --]]
 
 local Players = game:GetService("Players")
@@ -28,8 +28,8 @@ ScreenGui.ResetOnSpawn = false
 -- Frame Principal
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 320, 0, 460)
-MainFrame.Position = UDim2.new(0.5, -160, 0.5, -230)
+MainFrame.Size = UDim2.new(0, 320, 0, 480)
+MainFrame.Position = UDim2.new(0.5, -160, 0.5, -240)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 MainFrame.BackgroundTransparency = 0.1
 MainFrame.BorderSizePixel = 2
@@ -44,11 +44,11 @@ Glow.Thickness = 2
 Glow.Transparency = 0.5
 Glow.Parent = MainFrame
 
--- Barra de Título Corrigida (Com espaço livre para os botões)
+-- Barra de Título (Mantida Perfeita)
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -75, 0, 35)
 Title.Position = UDim2.new(0, 8, 0, 0)
-Title.Text = "TROLL GUI v2.6"
+Title.Text = "TROLL GUI v2.9"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 14
 Title.TextXAlignment = Enum.TextXAlignment.Left
@@ -56,7 +56,6 @@ Title.BackgroundColor3 = Color3.fromRGB(50, 0, 100)
 Title.BackgroundTransparency = 1
 Title.Parent = MainFrame
 
--- Fundo da Barra Superior
 local TopBarBg = Instance.new("Frame")
 TopBarBg.Size = UDim2.new(1, 0, 0, 35)
 TopBarBg.BackgroundColor3 = Color3.fromRGB(50, 0, 100)
@@ -64,7 +63,6 @@ TopBarBg.BackgroundTransparency = 0.3
 TopBarBg.ZIndex = 0
 TopBarBg.Parent = MainFrame
 
--- Botão de Fechar (X)
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.new(0, 30, 0, 30)
 CloseBtn.Position = UDim2.new(1, -33, 0, 2)
@@ -79,7 +77,6 @@ CloseBtn.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
 end)
 
--- Botão de Minimizar (-)
 local MinimizeBtn = Instance.new("TextButton")
 MinimizeBtn.Size = UDim2.new(0, 30, 0, 30)
 MinimizeBtn.Position = UDim2.new(1, -66, 0, 2)
@@ -99,11 +96,10 @@ MinimizeBtn.MouseButton1Click:Connect(function()
             child.Visible = not isMinimized
         end
     end
-    MainFrame.Size = isMinimized and UDim2.new(0, 320, 0, 35) or UDim2.new(0, 320, 0, 460)
+    MainFrame.Size = isMinimized and UDim2.new(0, 320, 0, 35) or UDim2.new(0, 320, 0, 480)
     MinimizeBtn.Text = isMinimized and "+" or "-"
 end)
 
--- Container de Scroll Principal
 local ScrollContainer = Instance.new("ScrollingFrame")
 ScrollContainer.Size = UDim2.new(1, -10, 1, -45)
 ScrollContainer.Position = UDim2.new(0, 5, 0, 40)
@@ -152,9 +148,8 @@ local function CreateCategory(Name, Height)
 end
 
 local TargetContent = CreateCategory("👥 SELECIONAR ALVO", 130)
-local AdminContent = CreateCategory("⚔️ TROLL & COMBATE", 180)
+local AdminContent = CreateCategory("⚔️ TROLL & COMBATE", 210)
 
--- ==================== LISTA DE JOGADORES ====================
 local TargetLabel = Instance.new("TextLabel")
 TargetLabel.Size = UDim2.new(1, 0, 0, 22)
 TargetLabel.Text = "Alvo Atual: NENHUM"
@@ -242,34 +237,45 @@ end
 
 -- ==================== FUNÇÕES TROLL ====================
 
-CreateToggle(AdminContent, "🔒 Freeze Alvo (Real)", false, function(state)
+-- 1. FREEZE POR OBJETO FÍSICO NO TRONCO (Prende o jogador de verdade)
+CreateToggle(AdminContent, "🔒 Freeze Alvo (Prisão Obj)", false, function(state)
     if state then
         task.spawn(function()
-            local lockedPos = nil
-            while Toggles["🔒 Freeze Alvo (Real)"] and Toggles["🔒 Freeze Alvo (Real)"].GetState() do
+            local trapPart = nil
+            while Toggles["🔒 Freeze Alvo (Prisão Obj)"] and Toggles["🔒 Freeze Alvo (Prisão Obj)"].GetState() do
                 local target = Targets.Player
                 if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
                     local root = target.Character.HumanoidRootPart
-                    local humanoid = target.Character:FindFirstChildOfClass("Humanoid")
                     
-                    if not lockedPos then lockedPos = root.CFrame end
-                    root.CFrame = lockedPos
-                    root.Velocity = Vector3.new(0, 0, 0)
-                    if humanoid then humanoid.PlatformStand = true end
+                    if not trapPart or not trapPart.Parent then
+                        trapPart = Instance.new("Part")
+                        trapPart.Size = Vector3.new(4, 5, 4)
+                        trapPart.Transparency = 0.8 -- Invisível/Semi-transparente para atrapalhar fisicamente
+                        trapPart.CanCollide = true
+                        trapPart.Anchored = true
+                        trapPart.BrickColor = BrickColor.new("Really red")
+                        trapPart.Parent = Workspace
+                    end
+                    
+                    -- Trava o objeto exatamente no tronco do alvo para bloquear a movimentação física dele
+                    trapPart.CFrame = root.CFrame
                 else
-                    lockedPos = nil
+                    if trapPart then
+                        trapPart:Destroy()
+                        trapPart = nil
+                    end
                 end
                 task.wait(0.05)
             end
-            local target = Targets.Player
-            if target and target.Character then
-                local humanoid = target.Character:FindFirstChildOfClass("Humanoid")
-                if humanoid then humanoid.PlatformStand = false end
+            if trapPart then
+                trapPart:Destroy()
+                trapPart = nil
             end
         end)
     end
 end)
 
+-- 2. ESP COMPLETO (Intacto)
 CreateToggle(AdminContent, "👁️ ESP Completo", false, function(state)
     local ESPData = {}
     if state then
@@ -311,7 +317,10 @@ CreateToggle(AdminContent, "👁️ ESP Completo", false, function(state)
     end
 end)
 
--- SUPER RING CORRIGIDO (Ancorado temporariamente para não cair no chão)
+-- Variável Global para a Caixa de Texto de Distância do Super Ring
+local currentRingDistance = 3.5
+
+-- 3. SUPER RING DEFENSIVO (Velocidade 15 Padrão + TextBox de Distância 1 a 20)
 CreateToggle(AdminContent, "💫 Super Ring Defensivo", false, function(state)
     if state then
         task.spawn(function()
@@ -321,7 +330,9 @@ CreateToggle(AdminContent, "💫 Super Ring Defensivo", false, function(state)
             end
             task.wait(0.5)
             
-            local angle = 0
+            local currentAngle = 0
+            local spinSpeed = 15 -- Velocidade padrão fixa em 15
+            
             while Toggles["💫 Super Ring Defensivo"] and Toggles["💫 Super Ring Defensivo"].GetState() do
                 local char = LocalPlayer.Character
                 if char and char:FindFirstChild("HumanoidRootPart") then
@@ -329,41 +340,36 @@ CreateToggle(AdminContent, "💫 Super Ring Defensivo", false, function(state)
                     local gearName = "Gear" .. gearIdDefesa
                     local gearInstance = char:FindFirstChild(gearName) or LocalPlayer.Backpack:FindFirstChild(gearName)
                     
-                    if gearInstance and gearInstance:FindFirstChild("Handle") then
-                        local handle = gearInstance.Handle
+                    if gearInstance then
                         if gearInstance.Parent ~= Workspace then
                             gearInstance.Parent = Workspace
                         end
-                        
-                        -- Trava a física para flutuar sem cair no chão
-                        handle.Anchored = true
-                        handle.CanCollide = true
-                        
-                        angle = angle + 30
-                        local rad = math.rad(angle)
-                        local radius = 2
-                        local x = root.Position.X + math.cos(rad) * radius
-                        local z = root.Position.Z + math.sin(rad) * radius
-                        
-                        handle.CFrame = CFrame.new(Vector3.new(x, root.Position.Y + 0.5, z), root.Position)
-                        
-                        for _, p in ipairs(Players:GetPlayers()) do
-                            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                                local pRoot = p.Character.HumanoidRootPart
-                                if (pRoot.Position - handle.Position).Magnitude < 3.5 then
-                                    pRoot.Velocity = (pRoot.Position - root.Position).Unit * 80 + Vector3.new(0, 35, 0)
+                        local handle = gearInstance:FindFirstChild("Handle")
+                        if handle then
+                            handle.CanCollide = false
+                            
+                            currentAngle = currentAngle + spinSpeed
+                            if currentAngle >= 360 then currentAngle = 0 end
+                            
+                            local rad = math.rad(currentAngle)
+                            local radius = currentRingDistance -- Pega o valor digitado pelo usuário (1 a 20)
+                            local x = root.Position.X + math.cos(rad) * radius
+                            local z = root.Position.Z + math.sin(rad) * radius
+                            
+                            handle.CFrame = CFrame.new(Vector3.new(x, root.Position.Y, z), root.Position) * CFrame.Angles(0, math.rad(currentAngle), 0)
+                            
+                            for _, p in ipairs(Players:GetPlayers()) do
+                                if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                                    local pRoot = p.Character.HumanoidRootPart
+                                    if (pRoot.Position - handle.Position).Magnitude < 4 then
+                                        pRoot.Velocity = (pRoot.Position - root.Position).Unit * 120 + Vector3.new(0, 50, 0)
+                                    end
                                 end
                             end
                         end
                     end
                 end
-                task.wait(0.02)
-            end
-            
-            -- Desancora antes de devolver para evitar bugs de inventário
-            local gearInstance = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Gear" .. gearIdDefesa) or Workspace:FindFirstChild("Gear" .. gearIdDefesa)
-            if gearInstance and gearInstance:FindFirstChild("Handle") then
-                gearInstance.Handle.Anchored = false
+                RunService.RenderStepped:Wait()
             end
             
             if AvatarRemote then
@@ -373,7 +379,43 @@ CreateToggle(AdminContent, "💫 Super Ring Defensivo", false, function(state)
     end
 end)
 
--- ESPADA TELEGUIADA EM LOOP CORRIGIDA
+-- TextBox para Configurar a Distância do Super Ring (1 a 20)
+local DistanceFrame = Instance.new("Frame")
+DistanceFrame.Size = UDim2.new(1, 0, 0, 28)
+DistanceFrame.BackgroundTransparency = 1
+DistanceFrame.Parent = AdminContent
+
+local DistanceLabel = Instance.new("TextLabel")
+DistanceLabel.Size = UDim2.new(0.65, 0, 1, 0)
+DistanceLabel.Text = " 📏 Distância Ring (1-20)"
+DistanceLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+DistanceLabel.TextXAlignment = Enum.TextXAlignment.Left
+DistanceLabel.TextSize = 12
+DistanceLabel.BackgroundTransparency = 1
+DistanceLabel.Parent = DistanceFrame
+
+local DistanceBox = Instance.new("TextBox")
+DistanceBox.Size = UDim2.new(0, 55, 0, 22)
+DistanceBox.Position = UDim2.new(0.72, 0, 0, 3)
+DistanceBox.Text = "3.5"
+DistanceBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+DistanceBox.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+DistanceBox.TextSize = 12
+DistanceBox.Parent = DistanceFrame
+
+DistanceBox.FocusLost:Connect(function()
+    local val = tonumber(DistanceBox.Text)
+    if val then
+        if val < 1 then val = 1 end
+        if val > 20 then val = 20 end
+        currentRingDistance = val
+        DistanceBox.Text = tostring(val)
+    else
+        DistanceBox.Text = tostring(currentRingDistance)
+    end
+end)
+
+-- 4. ESPADA TELEGUIADA (Tween por proporção de distância)
 CreateToggle(AdminContent, "🚀 Espada Teleguiada (Loop)", false, function(state)
     if state then
         task.spawn(function()
@@ -385,7 +427,7 @@ CreateToggle(AdminContent, "🚀 Espada Teleguiada (Loop)", false, function(stat
                     if AvatarRemote then
                         AvatarRemote:FireServer({["id"] = gearIdAtaque, ["event"] = "equip", ["equiptype"] = "Gear"})
                     end
-                    task.wait(0.6)
+                    task.wait(0.4)
                     
                     local char = LocalPlayer.Character
                     local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -393,40 +435,35 @@ CreateToggle(AdminContent, "🚀 Espada Teleguiada (Loop)", false, function(stat
                     local gearInstance = char and (char:FindFirstChild(gearName) or LocalPlayer.Backpack:FindFirstChild(gearName))
                     
                     if root and gearInstance then
-                        if gearInstance.Parent == LocalPlayer.Backpack then
-                            gearInstance.Parent = char
-                        end
                         local handle = gearInstance:FindFirstChild("Handle")
                         if handle then
                             gearInstance.Parent = Workspace
-                            handle.Anchored = false
-                            handle.CanCollide = true
+                            handle.CanCollide = false
                             
                             local targetRoot = target.Character.HumanoidRootPart
-                            local distanciaTotal = (root.Position - targetRoot.Position).Magnitude
+                            local distancia = (handle.Position - targetRoot.Position).Magnitude
                             
-                            local blocos = math.ceil(distanciaTotal / 400)
-                            local tempoVoo = math.clamp(blocos * 0.7, 0.4, 10)
+                            local tempoTween = distancia / 400
+                            if tempoTween < 0.3 then tempoTween = 0.3 end
                             
-                            local tweenInfo = TweenInfo.new(tempoVoo, Enum.EasingStyle.Linear)
-                            local tween = TweenService:Create(handle, tweenInfo, {
+                            local tween = TweenService:Create(handle, TweenInfo.new(tempoTween, Enum.EasingStyle.Linear), {
                                 CFrame = targetRoot.CFrame + Vector3.new(0, 2, 0)
                             })
                             
                             tween:Play()
                             pcall(function() tween.Completed:Wait() end)
                             
-                            task.wait(0.2)
+                            task.wait(0.1)
                             if gearInstance and gearInstance.Parent then
                                 gearInstance:Destroy()
                             end
                         end
                     end
                 end
-                task.wait(1.5)
+                task.wait(1.2)
             end
         end)
     end
 end)
 
-print("[DELTA] Troll GUI v2.6 Carregada com Sucesso!")
+print("[DELTA] Troll GUI v2.9 Carregada com Sucesso!")
