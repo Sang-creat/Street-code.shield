@@ -1,469 +1,511 @@
---[[
-    SCRIPT TROLL GUI UNIVERSAL - DELTA EXECUTOR MOBILE
-    Versão: 2.9 (Super Ring com Input de Distância, Velocidade 15 e Freeze por Objeto Físico)
---]]
-
+-- Serviços necessários
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
-local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Camera = Workspace.CurrentCamera
+local CoreGui = game:GetService("CoreGui")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+
 local LocalPlayer = Players.LocalPlayer
 
-local Toggles = {}
-local Targets = {Player = nil}
+-- Remotes (Unificados)
+local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+local InteractGiftRE = Remotes:WaitForChild("InteractGiftRE")
+local SpawnVehiclesRE = Remotes:WaitForChild("SpawnVehiclesRE")
+local AvatarMainRE = Remotes:WaitForChild("AvatarMainRE")
 
-local AvatarRemote = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("AvatarMainRE")
+-- Variáveis de Estado Globais (Toggles)
+local giftFreezeActive = false
+local loopBringActive = false
+local loopGotoEnabled = false
+local activeLoopTarget = nil
+local loopTask = nil
+local isTeleporting = false
+local selectedTargetPlayer = nil
+local selectedToolId = "CupCoffee"
 
-if LocalPlayer.PlayerGui:FindFirstChild("TrollGUI_Mobile") then
-    LocalPlayer.PlayerGui.TrollGUI_Mobile:Destroy()
+-- Grupos de Gears (Mantido com a lógica original exata)
+local GearGroups = {
+    {Name = "DEFESA", Color = Color3.fromRGB(52, 152, 219), Gears = {94794847, 236441643, 80661504}, Active = false},
+    {Name = "ESPADAS", Color = Color3.fromRGB(231, 76, 60), Gears = {99119240, 93136746, 108158379, 268586231}, Active = false},
+    {Name = "1-ATAQUE BÁSICO", Color = Color3.fromRGB(46, 204, 113), Gears = {26017478, 70476425, 1208300505}, Active = false},
+    {Name = "2-ATAQUE INDIRETO", Color = Color3.fromRGB(241, 196, 15), Gears = {127506257, 108158379, 70476425}, Active = false},
+    {Name = "3-ATAQUE DIRETO OP", Color = Color3.fromRGB(155, 89, 182), Gears = {127506257, 268586231, 1117745433}, Active = false},
+    {Name = "INVISIBILIDADE", Color = Color3.fromRGB(149, 165, 166), Special = true, CapaID = 129471121, Active = false}
+}
+
+-- Remove GUI anterior se já existir para evitar duplicatas
+if CoreGui:FindFirstChild("TrollHubMobile") then
+    CoreGui.TrollHubMobile:Destroy()
 end
 
+-- Criação da ScreenGui principal
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "TrollGUI_Mobile"
-ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-ScreenGui.ResetOnSpawn = false
+ScreenGui.Name = "TrollHubMobile"
+ScreenGui.Parent = CoreGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
--- Frame Principal
+-- Botão Flutuante (Abrir/Fechar Hub na Tela)
+local ToggleGuiBtn = Instance.new("TextButton", ScreenGui)
+ToggleGuiBtn.Size = UDim2.new(0, 60, 0, 35)
+ToggleGuiBtn.Position = UDim2.new(0.05, 0, 0.1, 0)
+ToggleGuiBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+ToggleGuiBtn.Text = "HUB"
+ToggleGuiBtn.TextColor3 = Color3.new(1, 1, 1)
+ToggleGuiBtn.Font = Enum.Font.SourceSansBold
+ToggleGuiBtn.TextSize = 13
+Instance.new("UICorner", ToggleGuiBtn)
+
+-- Janela Principal (Arredondada e Arrastável)
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 320, 0, 480)
-MainFrame.Position = UDim2.new(0.5, -160, 0.5, -240)
-MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-MainFrame.BackgroundTransparency = 0.1
-MainFrame.BorderSizePixel = 2
-MainFrame.BorderColor3 = Color3.fromRGB(100, 0, 255)
 MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+MainFrame.Position = UDim2.new(0.15, 0, 0.15, 0)
+MainFrame.Size = UDim2.new(0, 340, 0, 460)
 MainFrame.Active = true
 MainFrame.Draggable = true
 
-local Glow = Instance.new("UIStroke")
-Glow.Color = Color3.fromRGB(150, 0, 255)
-Glow.Thickness = 2
-Glow.Transparency = 0.5
-Glow.Parent = MainFrame
+local UICornerMain = Instance.new("UICorner")
+UICornerMain.CornerRadius = UDim.new(0, 10)
+UICornerMain.Parent = MainFrame
 
--- Barra de Título (Mantida Perfeita)
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, -75, 0, 35)
-Title.Position = UDim2.new(0, 8, 0, 0)
-Title.Text = "TROLL GUI v2.9"
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextSize = 14
-Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.BackgroundColor3 = Color3.fromRGB(50, 0, 100)
+-- Barra Superior (Título e Fechar)
+local TopBar = Instance.new("Frame", MainFrame)
+TopBar.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+TopBar.Size = UDim2.new(1, 0, 0, 35)
+Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 10)
+
+local Title = Instance.new("TextLabel", TopBar)
 Title.BackgroundTransparency = 1
-Title.Parent = MainFrame
+Title.Position = UDim2.new(0.03, 0, 0, 0)
+Title.Size = UDim2.new(0.7, 0, 1, 0)
+Title.Font = Enum.Font.SourceSansBold
+Title.Text = "Troll Hub - Master Mobile"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 15
+Title.TextXAlignment = Enum.TextXAlignment.Left
 
-local TopBarBg = Instance.new("Frame")
-TopBarBg.Size = UDim2.new(1, 0, 0, 35)
-TopBarBg.BackgroundColor3 = Color3.fromRGB(50, 0, 100)
-TopBarBg.BackgroundTransparency = 0.3
-TopBarBg.ZIndex = 0
-TopBarBg.Parent = MainFrame
-
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 30, 0, 30)
-CloseBtn.Position = UDim2.new(1, -33, 0, 2)
-CloseBtn.ZIndex = 2
-CloseBtn.Text = "X"
-CloseBtn.TextColor3 = Color3.fromRGB(255, 0, 0)
-CloseBtn.TextScaled = true
-CloseBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-CloseBtn.BackgroundTransparency = 0.3
-CloseBtn.Parent = MainFrame
-CloseBtn.MouseButton1Click:Connect(function()
-    ScreenGui:Destroy()
+ToggleGuiBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = not MainFrame.Visible
 end)
 
-local MinimizeBtn = Instance.new("TextButton")
-MinimizeBtn.Size = UDim2.new(0, 30, 0, 30)
-MinimizeBtn.Position = UDim2.new(1, -66, 0, 2)
-MinimizeBtn.ZIndex = 2
-MinimizeBtn.Text = "-"
-MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 0)
-MinimizeBtn.TextScaled = true
-MinimizeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-MinimizeBtn.BackgroundTransparency = 0.3
-MinimizeBtn.Parent = MainFrame
+-- Sistema de Abas (Navegação Compacta)
+local TabBar = Instance.new("Frame", MainFrame)
+TabBar.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
+TabBar.Position = UDim2.new(0, 0, 0, 40)
+TabBar.Size = UDim2.new(1, 0, 0, 30)
 
-local isMinimized = false
-MinimizeBtn.MouseButton1Click:Connect(function()
-    isMinimized = not isMinimized
-    for _, child in ipairs(MainFrame:GetChildren()) do
-        if child:IsA("ScrollingFrame") then
-            child.Visible = not isMinimized
-        end
-    end
-    MainFrame.Size = isMinimized and UDim2.new(0, 320, 0, 35) or UDim2.new(0, 320, 0, 480)
-    MinimizeBtn.Text = isMinimized and "+" or "-"
-end)
+local TabListLayout = Instance.new("UIListLayout", TabBar)
+TabListLayout.FillDirection = Enum.FillDirection.Horizontal
+TabListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+TabListLayout.Padding = UDim.new(0, 5)
 
-local ScrollContainer = Instance.new("ScrollingFrame")
-ScrollContainer.Size = UDim2.new(1, -10, 1, -45)
-ScrollContainer.Position = UDim2.new(0, 5, 0, 40)
-ScrollContainer.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-ScrollContainer.BackgroundTransparency = 0.5
-ScrollContainer.BorderSizePixel = 0
-ScrollContainer.Parent = MainFrame
-ScrollContainer.CanvasSize = UDim2.new(0, 0, 2, 0)
-ScrollContainer.ScrollBarThickness = 5
+-- Container Geral de Páginas
+local PageContainer = Instance.new("Frame", MainFrame)
+PageContainer.BackgroundTransparency = 1
+PageContainer.Position = UDim2.new(0, 0, 0, 75)
+PageContainer.Size = UDim2.new(1, 0, 1, -75)
 
-local UILayout = Instance.new("UIListLayout")
-UILayout.Parent = ScrollContainer
-UILayout.Padding = UDim.new(0, 8)
-UILayout.SortOrder = Enum.SortOrder.LayoutOrder
-
-local function CreateCategory(Name, Height)
-    local Category = Instance.new("Frame")
-    Category.Size = UDim2.new(1, 0, 0, Height)
-    Category.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    Category.BackgroundTransparency = 0.2
-    Category.BorderSizePixel = 1
-    Category.BorderColor3 = Color3.fromRGB(80, 80, 150)
-    Category.Parent = ScrollContainer
+local function createPage()
+    local scroll = Instance.new("ScrollingFrame", PageContainer)
+    scroll.BackgroundTransparency = 1
+    scroll.Size = UDim2.new(1, 0, 1, 0)
+    scroll.CanvasSize = UDim2.new(0, 0, 2, 0)
+    scroll.ScrollBarThickness = 4
+    scroll.Visible = false
     
-    local TitleLbl = Instance.new("TextLabel")
-    TitleLbl.Size = UDim2.new(1, 0, 0, 25)
-    TitleLbl.Text = Name
-    TitleLbl.TextColor3 = Color3.fromRGB(200, 200, 255)
-    TitleLbl.TextScaled = true
-    TitleLbl.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-    TitleLbl.BackgroundTransparency = 0.2
-    TitleLbl.Parent = Category
-    
-    local Content = Instance.new("Frame")
-    Content.Size = UDim2.new(1, -4, 1, -28)
-    Content.Position = UDim2.new(0, 2, 0, 28)
-    Content.BackgroundTransparency = 1
-    Content.Parent = Category
-    
-    local ContentLayout = Instance.new("UIListLayout")
-    ContentLayout.Parent = Content
-    ContentLayout.Padding = UDim.new(0, 3)
-    ContentLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    
-    return Content
+    local layout = Instance.new("UIListLayout", scroll)
+    layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Padding = UDim.new(0, 8)
+    return scroll
 end
 
-local TargetContent = CreateCategory("👥 SELECIONAR ALVO", 130)
-local AdminContent = CreateCategory("⚔️ TROLL & COMBATE", 210)
+local PageAlvo = createPage()
+local PageTroll = createPage()
+local PageGears = createPage()
+PageAlvo.Visible = true -- Página inicial padrão
 
-local TargetLabel = Instance.new("TextLabel")
-TargetLabel.Size = UDim2.new(1, 0, 0, 22)
-TargetLabel.Text = "Alvo Atual: NENHUM"
-TargetLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
-TargetLabel.TextScaled = true
-TargetLabel.BackgroundTransparency = 1
-TargetLabel.Parent = TargetContent
+local function switchPage(targetPage)
+    PageAlvo.Visible = false
+    PageTroll.Visible = false
+    PageGears.Visible = false
+    targetPage.Visible = true
+end
 
-local PlayerScroll = Instance.new("ScrollingFrame")
-PlayerScroll.Size = UDim2.new(1, 0, 0, 95)
-PlayerScroll.Position = UDim2.new(0, 0, 0, 25)
-PlayerScroll.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-PlayerScroll.BorderSizePixel = 0
-PlayerScroll.Parent = TargetContent
-PlayerScroll.ScrollBarThickness = 4
+-- Botões das Abas
+local function createTabButton(name, targetPage)
+    local btn = Instance.new("TextButton", TabBar)
+    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    btn.Size = UDim2.new(0.31, 0, 0.8, 0)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.Text = name
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.TextSize = 12
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    
+    btn.MouseButton1Click:Connect(function()
+        switchPage(targetPage)
+    end)
+end
 
-local PlayerLayout = Instance.new("UIListLayout")
-PlayerLayout.Parent = PlayerScroll
-PlayerLayout.Padding = UDim.new(0, 2)
+createTabButton("1. Alvo", PageAlvo)
+createTabButton("2. Troll/TP", PageTroll)
+createTabButton("3. Gears", PageGears)
 
-local function UpdatePlayerList()
-    for _, child in ipairs(PlayerScroll:GetChildren()) do
+-- ================= PAGE 1: SELEÇÃO DE ALVO (Única para todo o Hub) =================
+local function createSectionTitle(parent, text)
+    local lbl = Instance.new("TextLabel", parent)
+    lbl.BackgroundTransparency = 1
+    lbl.Size = UDim2.new(0.9, 0, 0, 25)
+    lbl.Font = Enum.Font.SourceSansBold
+    lbl.Text = text
+    lbl.TextColor3 = Color3.fromRGB(200, 100, 100)
+    lbl.TextSize = 13
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+end
+
+createSectionTitle(PageAlvo, "Alvo Selecionado Atualmente:")
+
+local TargetDisplay = Instance.new("TextLabel", PageAlvo)
+TargetDisplay.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
+TargetDisplay.Size = UDim2.new(0.9, 0, 0, 32)
+TargetDisplay.Font = Enum.Font.SourceSansBold
+TargetDisplay.Text = "Nenhum alvo selecionado"
+TargetDisplay.TextColor3 = Color3.fromRGB(255, 255, 100)
+TargetDisplay.TextSize = 13
+Instance.new("UICorner", TargetDisplay).CornerRadius = UDim.new(0, 6)
+
+createSectionTitle(PageAlvo, "Lista de Jogadores no Servidor (Toque para escolher):")
+
+local PlayerListScroll = Instance.new("ScrollingFrame", PageAlvo)
+PlayerListScroll.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+PlayerListScroll.Size = UDim2.new(0.9, 0, 0, 260)
+PlayerListScroll.CanvasSize = UDim2.new(0, 0, 2, 0)
+PlayerListScroll.ScrollBarThickness = 4
+Instance.new("UICorner", PlayerListScroll).CornerRadius = UDim.new(0, 6)
+
+local UIListPlayers = Instance.new("UIListLayout", PlayerListScroll)
+UIListPlayers.SortOrder = Enum.SortOrder.LayoutOrder
+UIListPlayers.Padding = UDim.new(0, 4)
+
+local function refreshPlayerList()
+    for _, child in ipairs(PlayerListScroll:GetChildren()) do
         if child:IsA("TextButton") then child:Destroy() end
     end
     
-    local count = 0
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= LocalPlayer then
-            count = count + 1
-            local Btn = Instance.new("TextButton")
-            Btn.Size = UDim2.new(1, -5, 0, 26)
-            Btn.Text = "  " .. plr.Name
-            Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            Btn.TextSize = 13
-            Btn.TextXAlignment = Enum.TextXAlignment.Left
-            Btn.BackgroundColor3 = Color3.fromRGB(45, 45, 60)
-            Btn.Parent = PlayerScroll
+            local pBtn = Instance.new("TextButton", PlayerListScroll)
+            pBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+            pBtn.Size = UDim2.new(1, -4, 0, 30)
+            pBtn.Font = Enum.Font.SourceSans
+            pBtn.Text = " " .. plr.Name .. " (ID: " .. plr.UserId .. ")"
+            pBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            pBtn.TextSize = 12
+            pBtn.TextXAlignment = Enum.TextXAlignment.Left
+            Instance.new("UICorner", pBtn).CornerRadius = UDim.new(0, 4)
             
-            Btn.MouseButton1Click:Connect(function()
-                Targets.Player = plr
-                TargetLabel.Text = "Alvo: " .. plr.Name
+            pBtn.MouseButton1Click:Connect(function()
+                selectedTargetPlayer = plr
+                activeLoopTarget = plr -- Integrado com o sistema de LoopGoto também
+                TargetDisplay.Text = "Alvo: " .. plr.Name .. " [" .. plr.UserId .. "]"
             end)
         end
     end
-    PlayerScroll.CanvasSize = UDim2.new(0, 0, 0, count * 28)
 end
 
-Players.PlayerAdded:Connect(UpdatePlayerList)
-Players.PlayerRemoving:Connect(UpdatePlayerList)
-UpdatePlayerList()
+refreshPlayerList()
+Players.PlayerAdded:Connect(refreshPlayerList)
+Players.PlayerRemoving:Connect(refreshPlayerList)
 
-local function CreateToggle(Parent, Label, Default, Callback)
-    local Frame = Instance.new("Frame")
-    Frame.Size = UDim2.new(1, 0, 0, 28)
-    Frame.BackgroundTransparency = 1
-    Frame.Parent = Parent
-    
-    local LabelTxt = Instance.new("TextLabel")
-    LabelTxt.Size = UDim2.new(0.65, 0, 1, 0)
-    LabelTxt.Text = " " .. Label
-    LabelTxt.TextColor3 = Color3.fromRGB(220, 220, 220)
-    LabelTxt.TextXAlignment = Enum.TextXAlignment.Left
-    LabelTxt.TextSize = 12
-    LabelTxt.BackgroundTransparency = 1
-    LabelTxt.Parent = Frame
-    
-    local ToggleBtn = Instance.new("TextButton")
-    ToggleBtn.Size = UDim2.new(0, 55, 0, 22)
-    ToggleBtn.Position = UDim2.new(0.72, 0, 0, 3)
-    ToggleBtn.Text = Default and "ON" or "OFF"
-    ToggleBtn.TextColor3 = Default and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
-    ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-    ToggleBtn.Parent = Frame
-    
-    local State = Default
-    ToggleBtn.MouseButton1Click:Connect(function()
-        State = not State
-        ToggleBtn.Text = State and "ON" or "OFF"
-        ToggleBtn.TextColor3 = State and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
-        if Callback then Callback(State) end
+
+-- ================= PAGE 2: FUNÇÕES DE TROLL E TELEPORTE =================
+createSectionTitle(PageTroll, "Controles de Troller e Alvo:")
+
+-- Função de Teleporte em Passos Segura
+local function tweenTeleportTo(targetCFrame)
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root or isTeleporting then return end
+
+    isTeleporting = true
+    local noclip = RunService.Stepped:Connect(function()
+        if char and char.Parent then
+            for _, p in ipairs(char:GetDescendants()) do 
+                if p:IsA("BasePart") then p.CanCollide = false end 
+            end
+        end
     end)
-    
-    Toggles[Label] = {GetState = function() return State end}
+
+    local distance = (root.Position - targetCFrame.Position).Magnitude
+    local tweenTime = math.clamp(distance / 400, 0.1, 15)
+    local tween = TweenService:Create(root, TweenInfo.new(tweenTime, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
+    tween:Play()
+    pcall(function() tween.Completed:Wait() end)
+
+    if noclip then noclip:Disconnect() end
+    isTeleporting = false
 end
 
--- ==================== FUNÇÕES TROLL ====================
-
--- 1. FREEZE POR OBJETO FÍSICO NO TRONCO (Prende o jogador de verdade)
-CreateToggle(AdminContent, "🔒 Freeze Alvo (Prisão Obj)", false, function(state)
-    if state then
-        task.spawn(function()
-            local trapPart = nil
-            while Toggles["🔒 Freeze Alvo (Prisão Obj)"] and Toggles["🔒 Freeze Alvo (Prisão Obj)"].GetState() do
-                local target = Targets.Player
-                if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-                    local root = target.Character.HumanoidRootPart
-                    
-                    if not trapPart or not trapPart.Parent then
-                        trapPart = Instance.new("Part")
-                        trapPart.Size = Vector3.new(4, 5, 4)
-                        trapPart.Transparency = 0.8 -- Invisível/Semi-transparente para atrapalhar fisicamente
-                        trapPart.CanCollide = true
-                        trapPart.Anchored = true
-                        trapPart.BrickColor = BrickColor.new("Really red")
-                        trapPart.Parent = Workspace
-                    end
-                    
-                    -- Trava o objeto exatamente no tronco do alvo para bloquear a movimentação física dele
-                    trapPart.CFrame = root.CFrame
-                else
-                    if trapPart then
-                        trapPart:Destroy()
-                        trapPart = nil
-                    end
-                end
-                task.wait(0.05)
-            end
-            if trapPart then
-                trapPart:Destroy()
-                trapPart = nil
-            end
-        end)
-    end
-end)
-
--- 2. ESP COMPLETO (Intacto)
-CreateToggle(AdminContent, "👁️ ESP Completo", false, function(state)
-    local ESPData = {}
-    if state then
-        task.spawn(function()
-            while Toggles["👁️ ESP Completo"] and Toggles["👁️ ESP Completo"].GetState() do
-                for _, obj in pairs(ESPData) do if obj then obj:Destroy() end end
-                ESPData = {}
-                
-                for _, player in ipairs(Players:GetPlayers()) do
-                    if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                        local char = player.Character
-                        local root = char.HumanoidRootPart
-                        local humanoid = char:FindFirstChildOfClass("Humanoid")
-                        
-                        local pos, onScreen = Camera:WorldToScreenPoint(root.Position)
-                        local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                        local dist = myRoot and math.floor((root.Position - myRoot.Position).Magnitude) or 0
-                        local hp = humanoid and math.floor(humanoid.Health) or 0
-                        local maxHp = humanoid and math.floor(humanoid.MaxHealth) or 100
-                        
-                        if onScreen then
-                            local infoLbl = Instance.new("TextLabel")
-                            infoLbl.Size = UDim2.new(0, 140, 0, 45)
-                            infoLbl.Position = UDim2.new(0, pos.X - 70, 0, pos.Y - 50)
-                            infoLbl.BackgroundTransparency = 0.5
-                            infoLbl.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-                            infoLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
-                            infoLbl.TextSize = 11
-                            infoLbl.Text = string.format("%s\nDist: %d studs\nHP: %d/%d", player.Name, dist, hp, maxHp)
-                            infoLbl.Parent = ScreenGui
-                            table.insert(ESPData, infoLbl)
-                        end
-                    end
-                end
-                task.wait(0.1)
-            end
-            for _, obj in pairs(ESPData) do if obj then obj:Destroy() end end
-        end)
-    end
-end)
-
--- Variável Global para a Caixa de Texto de Distância do Super Ring
-local currentRingDistance = 3.5
-
--- 3. SUPER RING DEFENSIVO (Velocidade 15 Padrão + TextBox de Distância 1 a 20)
-CreateToggle(AdminContent, "💫 Super Ring Defensivo", false, function(state)
-    if state then
-        task.spawn(function()
-            local gearIdDefesa = 268586231
-            if AvatarRemote then
-                AvatarRemote:FireServer({["id"] = gearIdDefesa, ["event"] = "equip", ["equiptype"] = "Gear"})
+-- Gerenciador do LoopGoto Seguro
+local function startLoopGoto()
+    if loopTask then task.cancel(loopTask) end
+    loopTask = task.spawn(function()
+        while loopGotoEnabled and activeLoopTarget do
+            local tChar = activeLoopTarget.Character
+            local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
+            if tRoot then
+                tweenTeleportTo(tRoot.CFrame + Vector3.new(0, 3, 0))
             end
             task.wait(0.5)
-            
-            local currentAngle = 0
-            local spinSpeed = 15 -- Velocidade padrão fixa em 15
-            
-            while Toggles["💫 Super Ring Defensivo"] and Toggles["💫 Super Ring Defensivo"].GetState() do
-                local char = LocalPlayer.Character
-                if char and char:FindFirstChild("HumanoidRootPart") then
-                    local root = char.HumanoidRootPart
-                    local gearName = "Gear" .. gearIdDefesa
-                    local gearInstance = char:FindFirstChild(gearName) or LocalPlayer.Backpack:FindFirstChild(gearName)
-                    
-                    if gearInstance then
-                        if gearInstance.Parent ~= Workspace then
-                            gearInstance.Parent = Workspace
-                        end
-                        local handle = gearInstance:FindFirstChild("Handle")
-                        if handle then
-                            handle.CanCollide = false
-                            
-                            currentAngle = currentAngle + spinSpeed
-                            if currentAngle >= 360 then currentAngle = 0 end
-                            
-                            local rad = math.rad(currentAngle)
-                            local radius = currentRingDistance -- Pega o valor digitado pelo usuário (1 a 20)
-                            local x = root.Position.X + math.cos(rad) * radius
-                            local z = root.Position.Z + math.sin(rad) * radius
-                            
-                            handle.CFrame = CFrame.new(Vector3.new(x, root.Position.Y, z), root.Position) * CFrame.Angles(0, math.rad(currentAngle), 0)
-                            
-                            for _, p in ipairs(Players:GetPlayers()) do
-                                if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                                    local pRoot = p.Character.HumanoidRootPart
-                                    if (pRoot.Position - handle.Position).Magnitude < 4 then
-                                        pRoot.Velocity = (pRoot.Position - root.Position).Unit * 120 + Vector3.new(0, 50, 0)
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-                RunService.RenderStepped:Wait()
-            end
-            
-            if AvatarRemote then
-                AvatarRemote:FireServer({["id"] = gearIdDefesa, ["event"] = "unequip", ["equiptype"] = "Gear"})
-            end
-        end)
+        end
+    end)
+end
+
+-- Botão 1: LoopGoto / Teleporte Contínuo ao Alvo
+local LoopGotoBtn = Instance.new("TextButton", PageTroll)
+LoopGotoBtn.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
+LoopGotoBtn.Size = UDim2.new(0.9, 0, 0, 36)
+LoopGotoBtn.Font = Enum.Font.SourceSansBold
+LoopGotoBtn.Text = "LoopGoto (Teleporte p/ Alvo): DESLIGADO"
+LoopGotoBtn.TextColor3 = Color3.new(1, 1, 1)
+LoopGotoBtn.TextSize = 13
+Instance.new("UICorner", LoopGotoBtn).CornerRadius = UDim.new(0, 6)
+
+LoopGotoBtn.MouseButton1Click:Connect(function()
+    if not selectedTargetPlayer then
+        TargetDisplay.Text = "ERRO: Selecione um alvo na Aba 1!"
+        return
     end
-end)
-
--- TextBox para Configurar a Distância do Super Ring (1 a 20)
-local DistanceFrame = Instance.new("Frame")
-DistanceFrame.Size = UDim2.new(1, 0, 0, 28)
-DistanceFrame.BackgroundTransparency = 1
-DistanceFrame.Parent = AdminContent
-
-local DistanceLabel = Instance.new("TextLabel")
-DistanceLabel.Size = UDim2.new(0.65, 0, 1, 0)
-DistanceLabel.Text = " 📏 Distância Ring (1-20)"
-DistanceLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-DistanceLabel.TextXAlignment = Enum.TextXAlignment.Left
-DistanceLabel.TextSize = 12
-DistanceLabel.BackgroundTransparency = 1
-DistanceLabel.Parent = DistanceFrame
-
-local DistanceBox = Instance.new("TextBox")
-DistanceBox.Size = UDim2.new(0, 55, 0, 22)
-DistanceBox.Position = UDim2.new(0.72, 0, 0, 3)
-DistanceBox.Text = "3.5"
-DistanceBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-DistanceBox.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-DistanceBox.TextSize = 12
-DistanceBox.Parent = DistanceFrame
-
-DistanceBox.FocusLost:Connect(function()
-    local val = tonumber(DistanceBox.Text)
-    if val then
-        if val < 1 then val = 1 end
-        if val > 20 then val = 20 end
-        currentRingDistance = val
-        DistanceBox.Text = tostring(val)
+    loopGotoEnabled = not loopGotoEnabled
+    if loopGotoEnabled then
+        LoopGotoBtn.Text = "LoopGoto (Teleporte p/ Alvo): LIGADO"
+        LoopGotoBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+        activeLoopTarget = selectedTargetPlayer
+        startLoopGoto()
     else
-        DistanceBox.Text = tostring(currentRingDistance)
+        LoopGotoBtn.Text = "LoopGoto (Teleporte p/ Alvo): DESLIGADO"
+        LoopGotoBtn.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
+        if loopTask then task.cancel(loopTask) loopTask = nil end
     end
 end)
 
--- 4. ESPADA TELEGUIADA (Tween por proporção de distância)
-CreateToggle(AdminContent, "🚀 Espada Teleguiada (Loop)", false, function(state)
-    if state then
+-- Botão 2: Freeze Loop (Drone UAV)
+local FreezeToggleBtn = Instance.new("TextButton", PageTroll)
+FreezeToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+FreezeToggleBtn.Size = UDim2.new(0.9, 0, 0, 36)
+FreezeToggleBtn.Font = Enum.Font.SourceSansBold
+FreezeToggleBtn.Text = "Freeze Loop (Drone): OFF"
+FreezeToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+FreezeToggleBtn.TextSize = 13
+Instance.new("UICorner", FreezeToggleBtn).CornerRadius = UDim.new(0, 6)
+
+FreezeToggleBtn.MouseButton1Click:Connect(function()
+    if not selectedTargetPlayer then
+        TargetDisplay.Text = "ERRO: Selecione um alvo na Aba 1!"
+        return
+    end
+
+    giftFreezeActive = not giftFreezeActive
+    if giftFreezeActive then
+        FreezeToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+        FreezeToggleBtn.Text = "Freeze Loop (Drone): ON"
+        
         task.spawn(function()
-            local gearIdAtaque = 268586231
-            
-            while Toggles["🚀 Espada Teleguiada (Loop)"] and Toggles["🚀 Espada Teleguiada (Loop)"].GetState() do
-                local target = Targets.Player
-                if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-                    if AvatarRemote then
-                        AvatarRemote:FireServer({["id"] = gearIdAtaque, ["event"] = "equip", ["equiptype"] = "Gear"})
-                    end
-                    task.wait(0.4)
-                    
-                    local char = LocalPlayer.Character
-                    local root = char and char:FindFirstChild("HumanoidRootPart")
-                    local gearName = "Gear" .. gearIdAtaque
-                    local gearInstance = char and (char:FindFirstChild(gearName) or LocalPlayer.Backpack:FindFirstChild(gearName))
-                    
-                    if root and gearInstance then
-                        local handle = gearInstance:FindFirstChild("Handle")
-                        if handle then
-                            gearInstance.Parent = Workspace
-                            handle.CanCollide = false
-                            
-                            local targetRoot = target.Character.HumanoidRootPart
-                            local distancia = (handle.Position - targetRoot.Position).Magnitude
-                            
-                            local tempoTween = distancia / 400
-                            if tempoTween < 0.3 then tempoTween = 0.3 end
-                            
-                            local tween = TweenService:Create(handle, TweenInfo.new(tempoTween, Enum.EasingStyle.Linear), {
-                                CFrame = targetRoot.CFrame + Vector3.new(0, 2, 0)
-                            })
-                            
-                            tween:Play()
-                            pcall(function() tween.Completed:Wait() end)
-                            
-                            task.wait(0.1)
-                            if gearInstance and gearInstance.Parent then
-                                gearInstance:Destroy()
-                            end
-                        end
-                    end
+            while giftFreezeActive do
+                if selectedTargetPlayer and selectedTargetPlayer.Parent and selectedTargetPlayer.UserId then
+                    local args = {
+                        GiftBox = "UAV",
+                        TargetUserId = selectedTargetPlayer.UserId,
+                        Action = "GiveGift",
+                        ToolId = selectedToolId
+                    }
+                    pcall(function() InteractGiftRE:FireServer(args) end)
+                    task.wait(3.5)
+                else
+                    task.wait(1)
                 end
-                task.wait(1.2)
             end
         end)
+    else
+        FreezeToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+        FreezeToggleBtn.Text = "Freeze Loop (Drone): OFF"
     end
 end)
 
-print("[DELTA] Troll GUI v2.9 Carregada com Sucesso!")
+-- Botão 3: LoopBring (Fantasminha)
+local LoopBringBtn = Instance.new("TextButton", PageTroll)
+LoopBringBtn.BackgroundColor3 = Color3.fromRGB(180, 100, 50)
+LoopBringBtn.Size = UDim2.new(0.9, 0, 0, 36)
+LoopBringBtn.Font = Enum.Font.SourceSansBold
+LoopBringBtn.Text = "LoopBring (Fantasminha): OFF"
+LoopBringBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+LoopBringBtn.TextSize = 13
+Instance.new("UICorner", LoopBringBtn).CornerRadius = UDim.new(0, 6)
+
+LoopBringBtn.MouseButton1Click:Connect(function()
+    if not selectedTargetPlayer then
+        TargetDisplay.Text = "ERRO: Selecione um alvo na Aba 1!"
+        return
+    end
+
+    loopBringActive = not loopBringActive
+    if loopBringActive then
+        LoopBringBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+        LoopBringBtn.Text = "LoopBring (Fantasminha): ON"
+        
+        task.spawn(function()
+            local connection
+            connection = RunService.RenderStepped:Connect(function()
+                if not loopBringActive then
+                    connection:Disconnect()
+                    return
+                end
+                pcall(function()
+                    if selectedTargetPlayer.Character and selectedTargetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                            local targetHRP = selectedTargetPlayer.Character.HumanoidRootPart
+                            local myHRP = LocalPlayer.Character.HumanoidRootPart
+                            targetHRP.CFrame = myHRP.CFrame * CFrame.new(0, 0, -3)
+                        end
+                    end
+                end)
+            end)
+        end)
+    else
+        LoopBringBtn.BackgroundColor3 = Color3.fromRGB(180, 100, 50)
+        LoopBringBtn.Text = "LoopBring (Fantasminha): OFF"
+    end
+end)
+
+-- Botão 4: Spawnar Carro de Teste
+local SpawnCarBtn = Instance.new("TextButton", PageTroll)
+SpawnCarBtn.BackgroundColor3 = Color3.fromRGB(60, 100, 180)
+SpawnCarBtn.Size = UDim2.new(0.9, 0, 0, 36)
+SpawnCarBtn.Font = Enum.Font.SourceSansBold
+SpawnCarBtn.Text = "Spawnar Carro (GTA_Car_10)"
+SpawnCarBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+SpawnCarBtn.TextSize = 13
+Instance.new("UICorner", SpawnCarBtn).CornerRadius = UDim.new(0, 6)
+
+SpawnCarBtn.MouseButton1Click:Connect(function()
+    pcall(function() SpawnVehiclesRE:FireServer("GTA_Car_10") end)
+end)
+
+
+-- ================= PAGE 3: HUB DE GEARS / AUTO EQUIP =================
+createSectionTitle(PageGears, "Gerenciador Automático de Gears e Bug:")
+
+local function deactivateAllExcept(currentGroup)
+    for _, g in ipairs(GearGroups) do
+        if g.Name ~= currentGroup.Name and g.Active then
+            g.Active = false
+        end
+    end
+end
+
+local function startGearsLoop(g)
+    task.spawn(function()
+        while g.Active do
+            for _, id in ipairs(g.Gears) do
+                if not g.Active then break end
+                AvatarMainRE:FireServer({["id"] = id, ["event"] = "equip", ["equiptype"] = "Gear"})
+                task.wait(0.2)
+            end
+            task.wait(5)
+        end
+    end)
+end
+
+local function executeInvisBug(g)
+    task.spawn(function()
+        if not g.Active then return end
+        local char = LocalPlayer.Character
+        if char then
+            local ff = char:FindFirstChild("ForceField")
+            while ff and g.Active do
+                task.wait(0.5)
+                ff = char:FindFirstChild("ForceField")
+            end
+        end
+        if not g.Active then return end
+        task.wait(0.5)
+        if not g.Active then return end
+
+        AvatarMainRE:FireServer({["id"] = g.CapaID, ["event"] = "equip", ["equiptype"] = "Gear"})
+        
+        local elapsed = 0
+        while elapsed < 2.0 and g.Active do
+            task.wait(0.1)
+            elapsed = elapsed + 0.1
+        end
+
+        if g.Active then
+            AvatarMainRE:FireServer({["id"] = g.CapaID, ["event"] = "unequip", ["equiptype"] = "Gear"})
+        end
+    end)
+end
+
+-- Construção dos Botões de Gears com Chave ON/OFF lateral
+for _, g in ipairs(GearGroups) do
+    local GearContainer = Instance.new("Frame", PageGears)
+    GearContainer.BackgroundTransparency = 1
+    GearContainer.Size = UDim2.new(0.9, 0, 0, 42)
+
+    local btn = Instance.new("TextButton", GearContainer)
+    btn.BackgroundColor3 = g.Color
+    btn.Size = UDim2.new(0.72, 0, 1, 0)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.Text = g.Name
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.TextSize = 11
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+
+    local toggleKey = Instance.new("TextButton", GearContainer)
+    toggleKey.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
+    toggleKey.Position = UDim2.new(0.76, 0, 0, 0)
+    toggleKey.Size = UDim2.new(0.24, 0, 1, 0)
+    toggleKey.Font = Enum.Font.SourceSansBold
+    toggleKey.Text = "OFF"
+    toggleKey.TextColor3 = Color3.new(1, 1, 1)
+    toggleKey.TextSize = 12
+    Instance.new("UICorner", toggleKey).CornerRadius = UDim.new(0, 6)
+
+    local function updateKeyVisual()
+        if g.Active then
+            toggleKey.Text = "ON"
+            toggleKey.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+        else
+            toggleKey.Text = "OFF"
+            toggleKey.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
+        end
+    end
+
+    local function toggleGroupState()
+        g.Active = not g.Active
+        if g.Active then
+            deactivateAllExcept(g)
+            if g.Special then executeInvisBug(g) else startGearsLoop(g) end
+        else
+            if g.Special then
+                AvatarMainRE:FireServer({["id"] = g.CapaID, ["event"] = "unequip", ["equiptype"] = "Gear"})
+            end
+        end
+        updateKeyVisual()
+    end
+
+    btn.MouseButton1Click:Connect(toggleGroupState)
+    toggleKey.MouseButton1Click:Connect(toggleGroupState)
+end
+
+-- Reconexão do Bug da Capa ao Renascer
+LocalPlayer.CharacterAdded:Connect(function(char)
+    char:WaitForChild("HumanoidRootPart")
+    task.wait(0.5)
+    for _, g in ipairs(GearGroups) do
+        if g.Active and g.Special then
+            executeInvisBug(g)
+        end
+    end
+end)
