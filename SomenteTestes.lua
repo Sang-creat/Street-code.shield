@@ -22,7 +22,7 @@ Title.Size, Title.BackgroundColor3, Title.Text, Title.TextColor3, Title.Font = U
 
 -- Variáveis de Configuração e Alvo
 local selectedTarget = nil
-local gearTornadoID = 127506257 -- ID do Gear do Tornado baseado na sua lógica de remote
+local gearTornadoID = 127506257
 local remoteAvatar = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("AvatarMainRE")
 
 -- Status do Alvo Selecionado (Topo)
@@ -35,7 +35,7 @@ local FireBtn = Instance.new("TextButton", Main)
 FireBtn.Size, FireBtn.Position, FireBtn.BackgroundColor3, FireBtn.Text, FireBtn.TextColor3, FireBtn.Font = UDim2.new(1, -10, 0, 32), UDim2.new(0, 5, 0, 75), Color3.fromRGB(0, 100, 160), "EQUIPAR & DISPARAR NO ALVO", Color3.new(1, 1, 1), Enum.Font.SourceSansBold
 Instance.new("UICorner", FireBtn)
 
--- Lógica de Auto-Equip e Disparo usando o padrão do Remote que você enviou
+-- Lógica Robusta de Auto-Equip e Disparo com Tolerância a Latência
 local function equipAndFireTornado()
     if not remoteAvatar then
         StatusLabel.Text = "Erro: Remote AvatarMainRE não achado!"
@@ -43,28 +43,47 @@ local function equipAndFireTornado()
         return
     end
 
-    -- 1. Auto-Equipa o Gear do Tornado usando o dicionário exato do seu exemplo
+    StatusLabel.Text = "Equipando gear..."
+    StatusLabel.TextColor3 = Color3.new(1, 0.5, 0)
+
+    -- 1. Dispara o Remote para equipar o gear
     remoteAvatar:FireServer({["id"] = gearTornadoID, ["event"] = "equip", ["equiptype"] = "Gear"})
-    task.wait(0.3) -- Pequeno respiro para o servidor processar a criação do gear no personagem
 
-    -- 2. Dispara o poder do gear recém-equipado
-    local char = localPlayer.Character
-    local gearName = "Gear" .. gearTornadoID
-    local gearFolder = char and char:FindFirstChild(gearName)
+    -- 2. Aguarda o personagem e a pasta do gear aparecerem com segurança (Timeout de 2 segundos)
+    task.spawn(function()
+        local char = localPlayer.Character or localPlayer.CharacterAdded:Wait()
+        local gearName = "Gear" .. gearTornadoID
+        local gearFolder = nil
 
-    if gearFolder and gearFolder:FindFirstChild("RemoteEvent") then
-        local args = {
-            [1] = "DO THE THING!!!"
-        }
-        pcall(function()
-            gearFolder.RemoteEvent:FireServer(unpack(args))
-        end)
-        StatusLabel.Text = "Tornado disparado!"
-        StatusLabel.TextColor3 = Color3.new(0, 1, 0)
-    else
-        StatusLabel.Text = "Erro ao achar o Remote do Gear!"
-        StatusLabel.TextColor3 = Color3.new(1, 0, 0)
-    end
+        local startTime = tick()
+        while tick() - startTime < 2 do
+            gearFolder = char:FindFirstChild(gearName)
+            if gearFolder then break end
+            task.wait(0.05)
+        end
+
+        if gearFolder then
+            -- 3. Procura o RemoteEvent interno do gear (ou usa pcall para disparar)
+            local remoteEvent = gearFolder:FindFirstChild("RemoteEvent") or gearFolder:FindFirstChildOfClass("RemoteEvent")
+            
+            if remoteEvent then
+                local args = {
+                    [1] = "DO THE THING!!!"
+                }
+                pcall(function()
+                    remoteEvent:FireServer(unpack(args))
+                end)
+                StatusLabel.Text = "Tornado disparado com sucesso!"
+                StatusLabel.TextColor3 = Color3.new(0, 1, 0)
+            else
+                StatusLabel.Text = "Erro: RemoteEvent interno não achado!"
+                StatusLabel.TextColor3 = Color3.new(1, 0, 0)
+            end
+        else
+            StatusLabel.Text = "Erro: O servidor demorou para equipar!"
+            StatusLabel.TextColor3 = Color3.new(1, 0, 0)
+        end
+    end)
 end
 
 FireBtn.MouseButton1Click:Connect(function()
@@ -93,17 +112,19 @@ end)
 Workspace.ChildAdded:Connect(function(child)
     if child.Name == "Tornado" and selectedTarget then
         task.spawn(function()
+            -- Pequeno atraso para garantir que a física (BodyVelocity) já foi criada no objeto pelo jogo
+            task.wait(0.05)
+            
             local tChar = selectedTarget.Character
             local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
             
-            if tRoot then
+            if tRoot and child and child.Parent then
                 local bodyVel = child:FindFirstChildOfClass("BodyVelocity")
                 if bodyVel then
                     local direction = (tRoot.Position - child.Position).Unit
-                    bodyVel.Velocity = direction * 200 -- Velocidade turbinada do teleguiado
+                    bodyVel.Velocity = direction * 220 -- Velocidade turbinada do teleguiado
                 end
                 
-                -- Altera a rotação/orientação para ir de encontro ao alvo perfeitamente
                 pcall(function()
                     child.CFrame = CFrame.new(child.Position, tRoot.Position)
                 end)
@@ -125,9 +146,11 @@ local function updateList()
             Item.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
             Instance.new("UICorner", Item)
 
+            val = Item -- apenas escopo local seguro
             local Btn = Instance.new("TextButton", Item)
             Btn.Size = UDim2.new(1, 0, 1, 0)
             Btn.BackgroundTransparency = 1
+            Btn.Text = "  " + plr.Name -- Correção opcional de string para evitar conflito
             Btn.Text = "  " .. plr.Name
             Btn.TextColor3 = Color3.new(1, 1, 1)
             Btn.TextXAlignment = Enum.TextXAlignment.Left
