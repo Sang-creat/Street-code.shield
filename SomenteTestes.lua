@@ -2,20 +2,22 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
-local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
 
 -- Configurações do Gear
 local GEAR_ID = 127506257
 local GEAR_NAME = "Gear" .. GEAR_ID
-local REMOTE_AVATAR = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("AvatarMainRE")
+
+-- Verificação segura do Remote do Avatar
+local RemotesFolder = ReplicatedStorage:WaitForChild("Remotes", 5)
+local REMOTE_AVATAR = RemotesFolder and RemotesFolder:WaitForChild("AvatarMainRE", 5)
 
 -- Variáveis de Estado
 local isRunning = false
 local selectedTarget = nil
 local lastShotTick = 0
-local COOLDOWN_TIME = 3.5 -- Ajuste conforme o cooldown real do gear no jogo
+local COOLDOWN_TIME = 3.5 
 
 -----------------------------------------------------------------
 -- CRIAÇÃO DA INTERFACE GRÁFICA (GUI)
@@ -102,8 +104,8 @@ UIListLayout.Parent = ScrollingFrame
 -- FUNÇÕES DE LOGICA DO SCRIPT
 -----------------------------------------------------------------
 
--- Função para equipar o gear via Remote capturado
 local function equipGear()
+    if not REMOTE_AVATAR then return end
     local args = {
         [1] = {
             ["id"] = GEAR_ID,
@@ -116,7 +118,6 @@ local function equipGear()
     end)
 end
 
--- Função para disparar o poder do gear
 local function fireGearPower()
     local character = LocalPlayer.Character
     if character and character:FindFirstChild(GEAR_NAME) then
@@ -130,9 +131,7 @@ local function fireGearPower()
     end
 end
 
--- Atualizar dinamicamente a lista de jogadores na UI
 local function updatePlayerList()
-    -- Limpar botões antigos
     for _, child in ipairs(ScrollingFrame:GetChildren()) do
         if child:IsA("TextButton") then
             child:Destroy()
@@ -156,7 +155,6 @@ local function updatePlayerList()
 
             pButton.MouseButton1Click:Connect(function()
                 selectedTarget = player
-                -- Destacar visualmente o alvo selecionado
                 for _, btn in ipairs(ScrollingFrame:GetChildren()) do
                     if btn:IsA("TextButton") then
                         btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
@@ -173,7 +171,6 @@ Players.PlayerAdded:Connect(updatePlayerList)
 Players.PlayerRemoving:Connect(updatePlayerList)
 updatePlayerList()
 
--- Botão Liga/Desliga
 ToggleButton.MouseButton1Click:Connect(function()
     isRunning = not isRunning
     if isRunning then
@@ -185,11 +182,27 @@ ToggleButton.MouseButton1Click:Connect(function()
     end
 end)
 
+-- Função auxiliar para mover o modelo do Tornado de forma segura
+local function trySetModelCFrame(model, targetCFrame)
+    pcall(function()
+        if model.PrimaryPart then
+            model:SetPrimaryPartCFrame(targetCFrame)
+        else
+            for _, part in ipairs(model:GetChildren()) do
+                if part:IsA("BasePart") then
+                    part.CFrame = targetCFrame
+                    break
+                end
+            end
+        end
+    end)
+end
+
 -----------------------------------------------------------------
--- TAREFAS DE BACKGROUND (LOOP INTELIGENTE)
+-- TAREFAS DE BACKGROUND (LOOPS)
 -----------------------------------------------------------------
 
--- 1. Checagem e Auto-Equip a cada 2 segundos (caso morra ou perca o item)
+-- 1. Auto-Equip a cada 2 segundos
 task.spawn(function()
     while true do
         task.wait(2)
@@ -202,61 +215,40 @@ task.spawn(function()
     end
 end)
 
--- 2. Loop principal de Disparo e Direcionamento para o Alvo
+-- 2. Loop principal de Disparo e Direcionamento
 task.spawn(function()
-    while true-- Ticks e pausas estruturadas para evitar sobrecarga
-    task.wait(0.5)
-    
-    if isRunning and selectedTarget and selectedTarget.Character then
-        local targetChar = selectedTarget.Character
-        local targetRoot = targetChar:FindFirstChild("HumanoidRootPart") or targetChar:FindFirstChild("Head")
+    while true do
+        task.wait(0.5)
         
-        local char = LocalPlayer.Character
-        if char and char:FindFirstChild(GEAR_NAME) then
-            -- Verifica se o cooldown permitira o disparo
-            if tick() - lastShotTick >= COOLDOWN_TIME then
-                -- Dispara o poder
-                fireGearPower()
-                lastShotTick = tick()
-                
-                -- Aguarda a renderização e aparição do modelo "Tornado" no Workspace
-                local tornadoInstance = nil
-                local startTime = tick()
-                
-                repeat
-                    tornadoInstance = Workspace:FindFirstChild("Tornado")
-                    task.wait(0.05)
-                until tornadoInstance or (tick() - startTime) > 1.5 -- Timeout de 1.5s para achar
-                
-                -- Se o tornado formou no workspace e temos um alvo válido, teleporta/direciona instantaneamente para o CFrame do alvo
-                if tornadoInstance and targetRoot then
-                    task.wait(0.2) -- Tempo hábil para o script nativo do jogo carregar o BodyForce/BodyVelocity
+        if isRunning and selectedTarget and selectedTarget.Character then
+            local targetChar = selectedTarget.Character
+            local targetRoot = targetChar:FindFirstChild("HumanoidRootPart") or targetChar:FindFirstChild("Head")
+            
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChild(GEAR_NAME) then
+                if tick() - lastShotTick >= COOLDOWN_TIME then
+                    fireGearPower()
+                    lastShotTick = tick()
                     
-                    if tornadoInstance:IsA("Model") then
-                        trySetModelCFrame(tornadoInstance, targetRoot.CFrame + Vector3.new(0, 3, 0))
-                    elseif tornadoInstance:IsA("BasePart") then
-                        tornadoInstance.CFrame = targetRoot.CFrame + Vector3.new(0, 3, 0)
+                    local tornadoInstance = nil
+                    local startTime = tick()
+                    
+                    repeat
+                        tornadoInstance = Workspace:FindFirstChild("Tornado")
+                        task.wait(0.05)
+                    until tornadoInstance or (tick() - startTime) > 1.5
+                    
+                    if tornadoInstance and targetRoot then
+                        task.wait(0.2)
+                        
+                        if tornadoInstance:IsA("Model") then
+                            trySetModelCFrame(tornadoInstance, targetRoot.CFrame + Vector3.new(0, 3, 0))
+                        elseif tornadoInstance:IsA("BasePart") then
+                            tornadoInstance.CFrame = targetRoot.CFrame + Vector3.new(0, 3, 0)
+                        end
                     end
                 end
             end
         end
     end
-end
 end)
-
--- Função auxiliar segura para mover o modelo inteiro do Tornado para o alvo
-function trySetModelCFrame(model, targetCFrame)
-    pcall(function()
-        if model.PrimaryPart then
-            model:SetPrimaryPartCFrame(targetCFrame)
-        else
-            -- Se não tiver PrimaryPart definida, move a primeira parte encontrada ou o corpo principal
-            for _, part in ipairs(model:GetChildren()) do
-                if part:IsA("BasePart") then
-                    part.CFrame = targetCFrame
-                    break
-                end
-            end
-        end
-    end)
-end
