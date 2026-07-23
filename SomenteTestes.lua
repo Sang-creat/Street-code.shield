@@ -46,10 +46,8 @@ local function equipAndFireTornado()
     StatusLabel.Text = "Equipando gear..."
     StatusLabel.TextColor3 = Color3.new(1, 0.5, 0)
 
-    -- 1. Dispara o Remote para equipar o gear
     remoteAvatar:FireServer({["id"] = gearTornadoID, ["event"] = "equip", ["equiptype"] = "Gear"})
 
-    -- 2. Aguarda o personagem e a pasta do gear aparecerem com segurança (Timeout de 2 segundos)
     task.spawn(function()
         local char = localPlayer.Character or localPlayer.CharacterAdded:Wait()
         local gearName = "Gear" .. gearTornadoID
@@ -63,7 +61,6 @@ local function equipAndFireTornado()
         end
 
         if gearFolder then
-            -- 3. Procura o RemoteEvent interno do gear (ou usa pcall para disparar)
             local remoteEvent = gearFolder:FindFirstChild("RemoteEvent") or gearFolder:FindFirstChildOfClass("RemoteEvent")
             
             if remoteEvent then
@@ -95,9 +92,14 @@ FireBtn.MouseButton1Click:Connect(function()
     equipAndFireTornado()
 end)
 
--- Lista de Jogadores (ScrollingFrame)
+-- LISTA DE JOGADORES (ScrollingFrame Corrigido e Ajustado)
 local Scroll = Instance.new("ScrollingFrame", Main)
-Scroll.Size, Scroll.Position, Scroll.BackgroundTransparency, Scroll.ScrollBarThickness = UDim2.new(1, -10, 1, -120), UDim2.new(0, 5, 0, 115), true, 6
+Scroll.Size = UDim2.new(1, -10, 0, 265)
+Scroll.Position = UDim2.new(0, 5, 0, 115)
+Scroll.BackgroundTransparency = 1
+Scroll.BorderSizePixel = 0
+Scroll.ScrollBarThickness = 6
+Scroll.ClipsDescendants = true
 Scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 
 local Layout = Instance.new("UIListLayout", Scroll)
@@ -112,7 +114,6 @@ end)
 Workspace.ChildAdded:Connect(function(child)
     if child.Name == "Tornado" and selectedTarget then
         task.spawn(function()
-            -- Pequeno atraso para garantir que a física (BodyVelocity) já foi criada no objeto pelo jogo
             task.wait(0.05)
             
             local tChar = selectedTarget.Character
@@ -122,7 +123,7 @@ Workspace.ChildAdded:Connect(function(child)
                 local bodyVel = child:FindFirstChildOfClass("BodyVelocity")
                 if bodyVel then
                     local direction = (tRoot.Position - child.Position).Unit
-                    bodyVel.Velocity = direction * 220 -- Velocidade turbinada do teleguiado
+                    bodyVel.Velocity = direction * 220
                 end
                 
                 pcall(function()
@@ -133,7 +134,7 @@ Workspace.ChildAdded:Connect(function(child)
     end
 end)
 
--- Atualizar Lista de Jogadores Dinamicamente
+-- Atualizar Lista de Jogadores Dinamicamente sem bugs
 local function updateList()
     for _, child in ipairs(Scroll:GetChildren()) do 
         if child:IsA("Frame") then child:Destroy() end 
@@ -142,15 +143,13 @@ local function updateList()
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= localPlayer then
             local Item = Instance.new("Frame", Scroll)
-            Item.Size = UDim2.new(1, -12, 0, 36)
+            Item.Size = UDim2.new(1, -6, 0, 36)
             Item.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
             Instance.new("UICorner", Item)
 
-            val = Item -- apenas escopo local seguro
             local Btn = Instance.new("TextButton", Item)
             Btn.Size = UDim2.new(1, 0, 1, 0)
             Btn.BackgroundTransparency = 1
-            Btn.Text = "  " + plr.Name -- Correção opcional de string para evitar conflito
             Btn.Text = "  " .. plr.Name
             Btn.TextColor3 = Color3.new(1, 1, 1)
             Btn.TextXAlignment = Enum.TextXAlignment.Left
