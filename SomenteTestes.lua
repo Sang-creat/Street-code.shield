@@ -5,7 +5,7 @@ local localPlayer = Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui")
 local parentGui = (pcall(function() return CoreGui:IsA("GuiService") end) and CoreGui) or localPlayer:WaitForChild("PlayerGui")
 
--- Remove GUI anterior para evitar duplicidade e bugs de execução
+-- Remove GUI anterior para evitar duplicidade
 if parentGui:FindFirstChild("TeleportGUI") then
     parentGui.TeleportGUI:Destroy()
 end
@@ -14,7 +14,7 @@ local ScreenGui = Instance.new("ScreenGui", parentGui)
 ScreenGui.Name, ScreenGui.ResetOnSpawn = "TeleportGUI", false
 
 local Main = Instance.new("Frame", ScreenGui)
-Main.Size, Main.Position, Main.BackgroundColor3, Main.Draggable, Main.Active = UDim2.new(0, 240, 0, 360), UDim2.new(0.5, -120, 0.5, -180), Color3.fromRGB(30, 30, 30), true, true
+Main.Size, Main.Position, Main.BackgroundColor3, Main.Draggable, Main.Active = UDim2.new(0, 260, 0, 380), UDim2.new(0.5, -130, 0.5, -190), Color3.fromRGB(30, 30, 30), true, true
 Instance.new("UICorner", Main)
 
 local Title = Instance.new("TextLabel", Main)
@@ -28,7 +28,7 @@ local isTeleporting = false
 
 -- Container de Botões de Alternância (Topo)
 local TopContainer = Instance.new("Frame", Main)
-TopContainer.Size, TopContainer.Position, TopContainer.BackgroundTransparency = UDim2.new(1, -10, 0, 30), UDim2.new(0, 5, 0, 40), true
+TopContainer.Size, TopContainer.Position, TopContainer.BackgroundTransparency = UDim2.new(1, -10, 0, 30), UDim2.new(0, 5, 0, 42), true
 local TopLayout = Instance.new("UIListLayout", TopContainer)
 TopLayout.FillDirection = Enum.FillDirection.Horizontal
 TopLayout.Padding = UDim.new(0, 5)
@@ -51,11 +51,15 @@ LoopToggleBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Lista de Jogadores (ScrollingFrame)
+-- Lista de Jogadores (ScrollingFrame com ajuste automático corrigido)
 local Scroll = Instance.new("ScrollingFrame", Main)
 Scroll.Size, Scroll.Position, Scroll.BackgroundTransparency, Scroll.ScrollBarThickness = UDim2.new(1, -10, 1, -85), UDim2.new(0, 5, 0, 80), true, 6
+Scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+Scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+
 local Layout = Instance.new("UIListLayout", Scroll)
-Layout.Padding = UDim.new(0, 4)
+Layout.Padding = UDim.new(0, 5)
+Layout.SortOrder = Enum.SortOrder.LayoutOrder
 
 -- FUNÇÃO CHAVE: Forçar o carregamento da área via BuildRE antes de interagir
 local function forceLoadArea(targetPosition)
@@ -82,7 +86,7 @@ local function tweenTeleportTo(targetCFrame)
 
     -- Força o carregamento da região de destino imediatamente antes do Tween
     forceLoadArea(targetCFrame.Position)
-    task.wait(0.15) -- Pequeno respiro técnico para o servidor streamar os dados do mapa
+    task.wait(0.15)
 
     local noclip = RunService.Stepped:Connect(function()
         if char and char.Parent then
@@ -106,7 +110,7 @@ local function tweenTeleportTo(targetCFrame)
     isTeleporting = false
 end
 
--- Gerenciador do LoopGoto Seguro com varredura de distância
+-- Gerenciador do LoopGoto Seguro
 local function startLoop()
     if loopTask then task.cancel(loopTask) end
     loopTask = task.spawn(function()
@@ -114,7 +118,6 @@ local function startLoop()
             local tChar = activeLoopTarget.Character
             local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
             if tRoot then
-                -- Garante que o loop atualize o foco da região onde o alvo está andando
                 forceLoadArea(tRoot.Position)
                 tweenTeleportTo(tRoot.CFrame + Vector3.new(0, 3, 0))
             end
@@ -132,14 +135,14 @@ local function updateList()
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= localPlayer then
             local Item = Instance.new("Frame", Scroll)
-            Item.Size, Item.BackgroundColor3 = UDim2.new(1, 0, 0, 32), Color3.fromRGB(50, 50, 50)
+            Item.Size, Item.BackgroundColor3 = UDim2.new(1, -5, 0, 35), Color3.fromRGB(50, 50, 50)
             Instance.new("UICorner", Item)
 
             local Btn = Instance.new("TextButton", Item)
-            Btn.Size, Btn.BackgroundTransparency, Btn.Text, Btn.TextColor3 = UDim2.new(1, 0, 1, 0), true, "  " + plr.Name, Color3.new(1, 1, 1) -- Nota: No Luau o operador de string é '..', ajustado abaixo
-            Btn.Text = "  " .. plr.Name
+            Btn.Size, Btn.BackgroundTransparency, Btn.Text = UDim2.new(1, 0, 1, 0), true, "  " .. plr.Name
+            Btn.TextColor3 = Color3.new(1, 1, 1)
             Btn.TextXAlignment = Enum.TextXAlignment.Left
-            Btn.Font = Enum.Font.SourceSans
+            Btn.Font = Enum.Font.SourceSansBold
             Btn.TextSize = 14
 
             Btn.MouseButton1Click:Connect(function()
@@ -152,14 +155,10 @@ local function updateList()
                     else
                         tweenTeleportTo(tRoot.CFrame + Vector3.new(0, 3, 0))
                     end
-                else
-                    -- Se o personagem estiver totalmente fora do raio e invisível, tenta forçar pelo último vetor conhecido ou posição padrão
-                    print("Alvo fora de alcance visual, forçando carregamento genérico...")
                 end
             end)
         end
     end
-    Scroll.CanvasSize = UDim2.new(0, 0, 0, #Players:GetPlayers() * 36)
 end
 
 Players.PlayerAdded:Connect(updateList)
