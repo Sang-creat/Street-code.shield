@@ -14,19 +14,19 @@ end
 local isEnabled = false
 local selectedTarget = nil
 local gearTornadoID = 127506257
-local isRunningLoop = false
 
--- Remotes
-local avatarRemote = ReplicatedStorage:WaitForChild("Remotes", 5) and ReplicatedStorage.Remotes:WaitForChild("AvatarMainRE", 5)
+-- Remote principal (mesma estrutura do seu exemplo)
+local remotesFolder = ReplicatedStorage:WaitForChild("Remotes", 5)
+local avatarRemote = remotesFolder and remotesFolder:WaitForChild("AvatarMainRE", 5)
 
--- Criação da Interface GUI (Otimizada para Mobile)
+-- Criação da Interface GUI (Mobile otimizada)
 local ScreenGui = Instance.new("ScreenGui", parentGui)
 ScreenGui.Name = "SuperRingHub"
 ScreenGui.ResetOnSpawn = false
 
 local Main = Instance.new("Frame", ScreenGui)
-Main.Size = UDim2.new(0, 290, 0, 410)
-Main.Position = UDim2.new(0.5, -145, 0.5, -205)
+Main.Size = UDim2.new(0, 290, 0, 430)
+Main.Position = UDim2.new(0.5, -145, 0.5, -215)
 Main.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
 Main.Draggable = true
 Main.Active = true
@@ -67,7 +67,7 @@ Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 6)
 
 -- ScrollingFrame para Lista de Jogadores
 local Scroll = Instance.new("ScrollingFrame", Main)
-Scroll.Size = UDim2.new(1, -16, 0, 265)
+Scroll.Size = UDim2.new(1, -16, 0, 280)
 Scroll.Position = UDim2.new(0, 8, 0, 126)
 Scroll.BackgroundTransparency = 1
 Scroll.BorderSizePixel = 0
@@ -82,76 +82,59 @@ UIList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     Scroll.CanvasSize = UDim2.new(0, 0, 0, UIList.AbsoluteContentSize.Y + 10)
 end)
 
--- Função Principal do Ciclo Super Ring (Equip, Disparar e Guiar)
-local function executeSuperRing()
+-- Lógica Unificada do Poder do Tornado
+local function triggerSuperRing()
     if not avatarRemote then return end
 
-    -- 1. Equipar o Gear via Remote Adaptado
+    -- 1. Requisição de equipar o gear via AvatarMainRE (seguindo exatamente a lógica fornecida)
     local equipArgs = {
         [1] = {
             ["event"] = "EquipGear",
             ["id"] = gearTornadoID
         }
     }
+    
     pcall(function()
         avatarRemote:FireServer(unpack(equipArgs))
     end)
 
-    -- 2. Aguarda o gear aparecer na mão do personagem
-    local char = localPlayer.Character or localPlayer.CharacterAdded:Wait()
-    local gearFolder = nil
-    local startTime = tick()
-    
-    while tick() - startTime < 2 do
-        gearFolder = char:FindFirstChild("Gear" .. gearTornadoID)
-        if gearFolder then break end
-        task.wait(0.05)
-    end
+    -- Pequena pausa para sincronização do servidor
+    task.wait(0.1)
 
-    if gearFolder then
-        local remoteEvent = gearFolder:FindFirstChild("RemoteEvent")
-        if remoteEvent then
-            -- 3. Disparar o Tornado
-            local fireArgs = { [1] = "DO THE THING!!!" }
-            pcall(function()
-                remoteEvent:FireServer(unpack(fireArgs))
-            end)
+    -- 2. Dispara o RemoteEvent interno do gear ("DO THE THING!!!")
+    local char = localPlayer.Character
+    if char then
+        local gearFolder = char:FindFirstChild("Gear" .. gearTornadoID)
+        if gearFolder then
+            local remoteEvent = gearFolder:FindFirstChild("RemoteEvent")
+            if remoteEvent then
+                local fireArgs = { [1] = "DO THE THING!!!" }
+                pcall(function()
+                    remoteEvent:FireServer(unpack(fireArgs))
+                end)
+            end
         end
     end
 end
 
--- Loop de Funcionamento Controlado pela Chave e Alvo
-task.spawn(function()
-    while true do
-        if isEnabled and selectedTarget and selectedTarget.Character and selectedTarget.Character:FindFirstChild("HumanoidRootPart") then
-            -- Executa o ciclo de disparo
-            pcall(function()
-                executeSuperRing()
-            end)
-            
-            -- Aguarda o cooldown estimado do gear antes de repetir
-            task.wait(3.5) 
-        else
-            task.wait(0.5)
-        end
-    end
-end)
-
--- Monitor de Física em Tempo Real no Workspace para o Alvo
+-- Monitoramento em tempo real do Workspace para capturar o "Tornado" gerado
 Workspace.ChildAdded:Connect(function(child)
     if isEnabled and child.Name == "Tornado" and selectedTarget then
         task.spawn(function()
-            task.wait(0.03) -- Tempo hábil para carregar componentes de física
+            task.wait(0.02) -- Aguarda os componentes físicos carregarem no Workspace
+            
             local tChar = selectedTarget.Character
             local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
             
             if tRoot and child and child.Parent then
+                -- Ajusta a velocidade e força do BodyVelocity para perseguir instantaneamente o alvo
                 local bodyVel = child:FindFirstChildOfClass("BodyVelocity")
                 if bodyVel then
                     local direction = (tRoot.Position - child.Position).Unit
-                    bodyVel.Velocity = direction * 250 -- Velocidade ajustada para alta precisão
+                    bodyVel.Velocity = direction * 300
                 end
                 
+                -- Altera o CFrame para direcionar o frame do tornado nas coordenadas do alvo
                 pcall(function()
                     child.CFrame = CFrame.new(child.Position, tRoot.Position)
                 end)
@@ -160,7 +143,26 @@ Workspace.ChildAdded:Connect(function(child)
     end
 end)
 
--- Botão Liga/Desliga
+-- Loop de Repetição Automática baseada no Cooldown e Chave Ligada
+task.spawn(function()
+    while true do
+        if isEnabled and selectedTarget then
+            local tChar = selectedTarget.Character
+            local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
+            
+            if tRoot then
+                pcall(triggerSuperRing)
+            end
+            
+            -- Tempo de espera equivalente ao cooldown do gear
+            task.wait(3.5)
+        else
+            task.wait(0.4)
+        end
+    end
+end)
+
+-- Ação do Botão Liga/Desliga da Interface
 ToggleBtn.MouseButton1Click:Connect(function()
     isEnabled = not isEnabled
     if isEnabled then
@@ -172,7 +174,7 @@ ToggleBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Atualizador Dinâmico da Lista de Alvos
+-- Popular Lista de Jogadores na GUI
 local function updatePlayerList()
     for _, child in ipairs(Scroll:GetChildren()) do
         if child:IsA("TextButton") then child:Destroy() end
