@@ -15,14 +15,13 @@ local REMOTE_AVATAR = RemotesFolder and RemotesFolder:WaitForChild("AvatarMainRE
 -- Variáveis de Estado
 local isRunning = false
 local selectedTarget = nil
-local lastShotTick = 0
-local FAST_COOLDOWN = 0.6 -- Cooldown reduzido para permitir os disparos rápidos em sequência
+local isWaitingTornado = false
 
 -----------------------------------------------------------------
 -- INTERFACE GRÁFICA (GUI)
 -----------------------------------------------------------------
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "TornadoFastAimGui"
+ScreenGui.Name = "TornadoControlledGui"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
@@ -42,9 +41,9 @@ UICorner.Parent = MainFrame
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-Title.Text = "Tornado Rápido - Aim-Lock"
+Title.Text = "Tornado Controlado - Meio-Termo"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextSize = 16
+Title.TextSize = 15
 Title.Font = Enum.Font.SourceSansBold
 Title.Parent = MainFrame
 
@@ -125,7 +124,6 @@ local function fireGearPower()
     end
 end
 
--- Função para fixar a mira no alvo instantaneamente
 local function aimAtTarget(targetPlayer)
     pcall(function()
         local char = LocalPlayer.Character
@@ -192,11 +190,12 @@ ToggleButton.MouseButton1Click:Connect(function()
     else
         ToggleButton.Text = "Função: OFF"
         ToggleButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+        isWaitingTornado = false
     end
 end)
 
 -----------------------------------------------------------------
--- TAREFAS DE BACKGROUND (LOOP RÁPIDO COM AIM-LOCK)
+-- TAREFAS DE BACKGROUND (MEIO-TERMO CONTROLADO)
 -----------------------------------------------------------------
 
 -- 1. Auto-Equip a cada 2 segundos
@@ -212,22 +211,31 @@ task.spawn(function()
     end
 end)
 
--- 2. Loop de Disparos Rápidos em Sequência (Spam Controlado + Aim-Lock)
+-- 2. Loop de Disparo Controlado (Envia um, espera avançar um pouco, envia o próximo)
 task.spawn(function()
     while true do
-        task.wait(0.25) -- Verificação rápida para disparar assim que o cooldown permitir
+        task.wait(0.3)
         
-        if isRunning and selectedTarget and selectedTarget.Character then
+        if isRunning and selectedTarget and selectedTarget.Character and not isWaitingTornado then
             local char = LocalPlayer.Character
             if char and char:FindFirstChild(GEAR_NAME_STR) then
-                if tick() - lastShotTick >= FAST_COOLDOWN then
-                    -- Atualiza o Aim-Lock instantaneamente para o alvo se movimentando
-                    aimAtTarget(selectedTarget)
-                    
-                    -- Dispara o poder em sequência rápida
-                    fireGearPower()
-                    lastShotTick = tick()
+                isWaitingTornado = true
+                
+                -- Alinha a mira com o alvo atualizado
+                aimAtTarget(selectedTarget)
+                task.wait(0.1)
+                
+                -- Dispara um único tornado de cada vez
+                fireGearPower()
+                
+                -- Meio-termo: Aguarda 1.3 segundos para o tornado andar e se distanciar da origem antes de permitir o próximo
+                local waitTime = 0
+                while waitTime < 1.3 and isRunning do
+                    task.wait(0.1)
+                    waitTime = waitTime + 0.1
                 end
+                
+                isWaitingTornado = false
             end
         end
     end
