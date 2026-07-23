@@ -7,8 +7,7 @@ local LocalPlayer = Players.LocalPlayer
 
 -- Configurações do Gear
 local GEAR_ID = 127506257
-local GEAR_NAME = "Gear" + GEAR_ID -- Corrigido para concatenação padrão ou string literal
-local GEAR_NAME_STR = "Gear" .. GEAR_ID
+local GEAR_NAME_STR = "Gear" .. GEAR_ID -- Correção da concatenação
 
 local RemotesFolder = ReplicatedStorage:WaitForChild("Remotes", 5)
 local REMOTE_AVATAR = RemotesFolder and RemotesFolder:WaitForChild("AvatarMainRE", 5)
@@ -125,7 +124,6 @@ local function fireGearPower()
     end
 end
 
--- Função para virar o personagem diretamente para o alvo (Aim-Lock)
 local function aimAtTarget(targetPlayer)
     pcall(function()
         local char = LocalPlayer.Character
@@ -135,7 +133,6 @@ local function aimAtTarget(targetPlayer)
             local targetRoot = targetChar:FindFirstChild("HumanoidRootPart") or targetChar:FindFirstChild("Head")
             
             if rootPart and targetRoot then
-                -- Mantém a mesma altura (Y) para o personagem não olhar torto para cima/baixo abruptamente, travando apenas no plano horizontal
                 local targetPos = targetRoot.Position
                 local currentPos = rootPart.Position
                 local lookAtPos = Vector3.new(targetPos.X, currentPos.Y, targetPos.Z)
@@ -202,7 +199,6 @@ end)
 -- TAREFAS DE BACKGROUND (LOOPS)
 -----------------------------------------------------------------
 
--- 1. Auto-Equip a cada 2 segundos
 task.spawn(function()
     while true do
         task.wait(2)
@@ -215,7 +211,6 @@ task.spawn(function()
     end
 end)
 
--- 2. Loop principal com Aim-Lock e Disparo Direcionado
 task.spawn(function()
     while true do
         task.wait(0.5)
@@ -225,14 +220,11 @@ task.spawn(function()
             if char and char:FindFirstChild(GEAR_NAME_STR) then
                 isWaitingTornado = true
                 
-                -- Passo A: Alinha a mira do personagem para o alvo selecionado
                 aimAtTarget(selectedTarget)
-                task.wait(0.15) -- Pequeno respiro para o servidor registrar a rotação
+                task.wait(0.15)
                 
-                -- Passo B: Dispara o poder do gear alinhado
                 fireGearPower()
                 
-                -- Aguarda o ciclo do tornado terminar no Workspace para liberar o próximo disparo
                 local startTime = tick()
                 repeat
                     task.wait(0.5)
