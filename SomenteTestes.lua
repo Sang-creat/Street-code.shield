@@ -7,7 +7,7 @@ local LocalPlayer = Players.LocalPlayer
 
 -- Configurações do Gear
 local GEAR_ID = 127506257
-local GEAR_NAME_STR = "Gear" .. GEAR_ID -- Correção da concatenação
+local GEAR_NAME_STR = "Gear" .. GEAR_ID
 
 local RemotesFolder = ReplicatedStorage:WaitForChild("Remotes", 5)
 local REMOTE_AVATAR = RemotesFolder and RemotesFolder:WaitForChild("AvatarMainRE", 5)
@@ -15,13 +15,14 @@ local REMOTE_AVATAR = RemotesFolder and RemotesFolder:WaitForChild("AvatarMainRE
 -- Variáveis de Estado
 local isRunning = false
 local selectedTarget = nil
-local isWaitingTornado = false
+local lastShotTick = 0
+local FAST_COOLDOWN = 0.6 -- Cooldown reduzido para permitir os disparos rápidos em sequência
 
 -----------------------------------------------------------------
 -- INTERFACE GRÁFICA (GUI)
 -----------------------------------------------------------------
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "TornadoScriptGui"
+ScreenGui.Name = "TornadoFastAimGui"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
@@ -41,7 +42,7 @@ UICorner.Parent = MainFrame
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-Title.Text = "Controle de Tornado - Aim-Lock"
+Title.Text = "Tornado Rápido - Aim-Lock"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 16
 Title.Font = Enum.Font.SourceSansBold
@@ -124,6 +125,7 @@ local function fireGearPower()
     end
 end
 
+-- Função para fixar a mira no alvo instantaneamente
 local function aimAtTarget(targetPlayer)
     pcall(function()
         local char = LocalPlayer.Character
@@ -136,7 +138,6 @@ local function aimAtTarget(targetPlayer)
                 local targetPos = targetRoot.Position
                 local currentPos = rootPart.Position
                 local lookAtPos = Vector3.new(targetPos.X, currentPos.Y, targetPos.Z)
-                
                 rootPart.CFrame = CFrame.new(currentPos, lookAtPos)
             end
         end
@@ -191,14 +192,14 @@ ToggleButton.MouseButton1Click:Connect(function()
     else
         ToggleButton.Text = "Função: OFF"
         ToggleButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-        isWaitingTornado = false
     end
 end)
 
 -----------------------------------------------------------------
--- TAREFAS DE BACKGROUND (LOOPS)
+-- TAREFAS DE BACKGROUND (LOOP RÁPIDO COM AIM-LOCK)
 -----------------------------------------------------------------
 
+-- 1. Auto-Equip a cada 2 segundos
 task.spawn(function()
     while true do
         task.wait(2)
@@ -211,27 +212,22 @@ task.spawn(function()
     end
 end)
 
+-- 2. Loop de Disparos Rápidos em Sequência (Spam Controlado + Aim-Lock)
 task.spawn(function()
     while true do
-        task.wait(0.5)
+        task.wait(0.25) -- Verificação rápida para disparar assim que o cooldown permitir
         
-        if isRunning and selectedTarget and selectedTarget.Character and not isWaitingTornado then
+        if isRunning and selectedTarget and selectedTarget.Character then
             local char = LocalPlayer.Character
             if char and char:FindFirstChild(GEAR_NAME_STR) then
-                isWaitingTornado = true
-                
-                aimAtTarget(selectedTarget)
-                task.wait(0.15)
-                
-                fireGearPower()
-                
-                local startTime = tick()
-                repeat
-                    task.wait(0.5)
-                until not Workspace:FindFirstChild("Tornado") or (tick() - startTime) > 4.0 or not isRunning
-                
-                task.wait(1.0)
-                isWaitingTornado = false
+                if tick() - lastShotTick >= FAST_COOLDOWN then
+                    -- Atualiza o Aim-Lock instantaneamente para o alvo se movimentando
+                    aimAtTarget(selectedTarget)
+                    
+                    -- Dispara o poder em sequência rápida
+                    fireGearPower()
+                    lastShotTick = tick()
+                end
             end
         end
     end
