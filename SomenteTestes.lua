@@ -7,27 +7,25 @@ local LocalPlayer = Players.LocalPlayer
 
 -- Configurações do Gear
 local GEAR_ID = 127506257
-local GEAR_NAME = "Gear" .. GEAR_ID
+local GEAR_NAME = "Gear" + GEAR_ID -- Corrigido para concatenação padrão ou string literal
+local GEAR_NAME_STR = "Gear" .. GEAR_ID
 
--- Verificação segura do Remote do Avatar
 local RemotesFolder = ReplicatedStorage:WaitForChild("Remotes", 5)
 local REMOTE_AVATAR = RemotesFolder and RemotesFolder:WaitForChild("AvatarMainRE", 5)
 
 -- Variáveis de Estado
 local isRunning = false
 local selectedTarget = nil
-local lastShotTick = 0
-local COOLDOWN_TIME = 3.5 
+local isWaitingTornado = false
 
 -----------------------------------------------------------------
--- CRIAÇÃO DA INTERFACE GRÁFICA (GUI)
+-- INTERFACE GRÁFICA (GUI)
 -----------------------------------------------------------------
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "TornadoScriptGui"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
--- Janela Principal
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 320, 0, 380)
 MainFrame.Position = UDim2.new(0.5, -160, 0.5, -190)
@@ -41,11 +39,10 @@ local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(0, 8)
 UICorner.Parent = MainFrame
 
--- Título
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-Title.Text = "Controle de Tornado - RP"
+Title.Text = "Controle de Tornado - Aim-Lock"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 16
 Title.Font = Enum.Font.SourceSansBold
@@ -55,7 +52,6 @@ local TitleCorner = Instance.new("UICorner")
 TitleCorner.CornerRadius = UDim.new(0, 8)
 TitleCorner.Parent = Title
 
--- Botão ON/OFF
 local ToggleButton = Instance.new("TextButton")
 ToggleButton.Size = UDim2.new(0.9, 0, 0, 40)
 ToggleButton.Position = UDim2.new(0.05, 0, 0, 55)
@@ -70,7 +66,6 @@ local ToggleCorner = Instance.new("UICorner")
 ToggleCorner.CornerRadius = UDim.new(0, 6)
 ToggleCorner.Parent = ToggleButton
 
--- Label Lista de Alvos
 local TargetLabel = Instance.new("TextLabel")
 TargetLabel.Size = UDim2.new(0.9, 0, 0, 25)
 TargetLabel.Position = UDim2.new(0.05, 0, 0, 105)
@@ -82,7 +77,6 @@ TargetLabel.Font = Enum.Font.SourceSans
 TargetLabel.TextXAlignment = Enum.TextXAlignment.Left
 TargetLabel.Parent = MainFrame
 
--- ScrollingFrame para Lista de Jogadores
 local ScrollingFrame = Instance.new("ScrollingFrame")
 ScrollingFrame.Size = UDim2.new(0.9, 0, 0, 185)
 ScrollingFrame.Position = UDim2.new(0.05, 0, 0, 135)
@@ -101,7 +95,7 @@ UIListLayout.Padding = UDim.new(0, 4)
 UIListLayout.Parent = ScrollingFrame
 
 -----------------------------------------------------------------
--- FUNÇÕES DE LOGICA DO SCRIPT
+-- FUNÇÕES DE LOGICA E AIM-LOCK
 -----------------------------------------------------------------
 
 local function equipGear()
@@ -120,8 +114,8 @@ end
 
 local function fireGearPower()
     local character = LocalPlayer.Character
-    if character and character:FindFirstChild(GEAR_NAME) then
-        local gearItem = character[GEAR_NAME]
+    if character and character:FindFirstChild(GEAR_NAME_STR) then
+        local gearItem = character[GEAR_NAME_STR]
         local remoteEvent = gearItem:FindFirstChild("RemoteEvent")
         if remoteEvent then
             pcall(function()
@@ -129,6 +123,27 @@ local function fireGearPower()
             end)
         end
     end
+end
+
+-- Função para virar o personagem diretamente para o alvo (Aim-Lock)
+local function aimAtTarget(targetPlayer)
+    pcall(function()
+        local char = LocalPlayer.Character
+        local targetChar = targetPlayer and targetPlayer.Character
+        if char and targetChar then
+            local rootPart = char:FindFirstChild("HumanoidRootPart")
+            local targetRoot = targetChar:FindFirstChild("HumanoidRootPart") or targetChar:FindFirstChild("Head")
+            
+            if rootPart and targetRoot then
+                -- Mantém a mesma altura (Y) para o personagem não olhar torto para cima/baixo abruptamente, travando apenas no plano horizontal
+                local targetPos = targetRoot.Position
+                local currentPos = rootPart.Position
+                local lookAtPos = Vector3.new(targetPos.X, currentPos.Y, targetPos.Z)
+                
+                rootPart.CFrame = CFrame.new(currentPos, lookAtPos)
+            end
+        end
+    end)
 end
 
 local function updatePlayerList()
@@ -179,24 +194,9 @@ ToggleButton.MouseButton1Click:Connect(function()
     else
         ToggleButton.Text = "Função: OFF"
         ToggleButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+        isWaitingTornado = false
     end
 end)
-
--- Função auxiliar para mover o modelo do Tornado de forma segura
-local function trySetModelCFrame(model, targetCFrame)
-    pcall(function()
-        if model.PrimaryPart then
-            model:SetPrimaryPartCFrame(targetCFrame)
-        else
-            for _, part in ipairs(model:GetChildren()) do
-                if part:IsA("BasePart") then
-                    part.CFrame = targetCFrame
-                    break
-                end
-            end
-        end
-    end)
-end
 
 -----------------------------------------------------------------
 -- TAREFAS DE BACKGROUND (LOOPS)
@@ -208,46 +208,38 @@ task.spawn(function()
         task.wait(2)
         if isRunning then
             local char = LocalPlayer.Character
-            if char and not char:FindFirstChild(GEAR_NAME) then
+            if char and not char:FindFirstChild(GEAR_NAME_STR) then
                 equipGear()
             end
         end
     end
 end)
 
--- 2. Loop principal de Disparo e Direcionamento
+-- 2. Loop principal com Aim-Lock e Disparo Direcionado
 task.spawn(function()
     while true do
         task.wait(0.5)
         
-        if isRunning and selectedTarget and selectedTarget.Character then
-            local targetChar = selectedTarget.Character
-            local targetRoot = targetChar:FindFirstChild("HumanoidRootPart") or targetChar:FindFirstChild("Head")
-            
+        if isRunning and selectedTarget and selectedTarget.Character and not isWaitingTornado then
             local char = LocalPlayer.Character
-            if char and char:FindFirstChild(GEAR_NAME) then
-                if tick() - lastShotTick >= COOLDOWN_TIME then
-                    fireGearPower()
-                    lastShotTick = tick()
-                    
-                    local tornadoInstance = nil
-                    local startTime = tick()
-                    
-                    repeat
-                        tornadoInstance = Workspace:FindFirstChild("Tornado")
-                        task.wait(0.05)
-                    until tornadoInstance or (tick() - startTime) > 1.5
-                    
-                    if tornadoInstance and targetRoot then
-                        task.wait(0.2)
-                        
-                        if tornadoInstance:IsA("Model") then
-                            trySetModelCFrame(tornadoInstance, targetRoot.CFrame + Vector3.new(0, 3, 0))
-                        elseif tornadoInstance:IsA("BasePart") then
-                            tornadoInstance.CFrame = targetRoot.CFrame + Vector3.new(0, 3, 0)
-                        end
-                    end
-                end
+            if char and char:FindFirstChild(GEAR_NAME_STR) then
+                isWaitingTornado = true
+                
+                -- Passo A: Alinha a mira do personagem para o alvo selecionado
+                aimAtTarget(selectedTarget)
+                task.wait(0.15) -- Pequeno respiro para o servidor registrar a rotação
+                
+                -- Passo B: Dispara o poder do gear alinhado
+                fireGearPower()
+                
+                -- Aguarda o ciclo do tornado terminar no Workspace para liberar o próximo disparo
+                local startTime = tick()
+                repeat
+                    task.wait(0.5)
+                until not Workspace:FindFirstChild("Tornado") or (tick() - startTime) > 4.0 or not isRunning
+                
+                task.wait(1.0)
+                isWaitingTornado = false
             end
         end
     end
