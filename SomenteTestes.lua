@@ -1,51 +1,91 @@
-local Players, RunService, TweenService = game:GetService("Players"), game:GetService("RunService"), game:GetService("TweenService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
+local Players, ReplicatedStorage, Workspace = game:GetService("Players"), game:GetService("ReplicatedStorage"), game:GetService("Workspace")
 local localPlayer = Players.LocalPlayer
 
 local CoreGui = game:GetService("CoreGui")
 local parentGui = (pcall(function() return CoreGui:IsA("GuiService") end) and CoreGui) or localPlayer:WaitForChild("PlayerGui")
 
-if parentGui:FindFirstChild("TornadoHub") then
-    parentGui.TornadoHub:Destroy()
+if parentGui:FindFirstChild("TornadoHubMobile") then
+    parentGui.TornadoHubMobile:Destroy()
 end
 
-local ScreenGui = Instance.new("ScreenGui", parentGui)
-ScreenGui.Name, ScreenGui.ResetOnSpawn = "TornadoHub", false
-
-local Main = Instance.new("Frame", ScreenGui)
-Main.Size, Main.Position, Main.BackgroundColor3, Main.Draggable, Main.Active = UDim2.new(0, 260, 0, 420), UDim2.new(0.5, -130, 0.5, -210), Color3.fromRGB(30, 30, 30), true, true
-Instance.new("UICorner", Main)
-
-local Title = Instance.new("TextLabel", Main)
-Title.Size, Title.BackgroundColor3, Title.Text, Title.TextColor3, Title.Font = UDim2.new(1, 0, 0, 35), Color3.fromRGB(45, 45, 45), "Teleguiado de Tornado", Color3.new(1, 1, 1), Enum.Font.SourceSansBold
-
--- Variáveis de Configuração e Alvo
+-- Variáveis de Controle
 local selectedTarget = nil
 local gearTornadoID = 127506257
 local remoteAvatar = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("AvatarMainRE")
 
--- Status do Alvo Selecionado (Topo)
+-- Interface Principal
+local ScreenGui = Instance.new("ScreenGui", parentGui)
+ScreenGui.Name, ScreenGui.ResetOnSpawn = "TornadoHubMobile", false
+
+local Main = Instance.new("Frame", ScreenGui)
+Main.Size, Main.Position = UDim2.new(0, 280, 0, 390)
+Main.Position = UDim2.new(0.5, -140, 0.5, -195)
+Main.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
+Main.Draggable, Main.Active = true, true
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 8)
+
+-- Barra de Título
+local Title = Instance.new("TextLabel", Main)
+Title.Size = UDim2.new(1, 0, 0, 35)
+Title.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+Title.Text = " Tornado Teleguiado Hub"
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 16
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 8)
+
+-- Status do Alvo
 local StatusLabel = Instance.new("TextLabel", Main)
-StatusLabel.Size, StatusLabel.Position, StatusLabel.BackgroundColor3, StatusLabel.Text, StatusLabel.TextColor3 = UDim2.new(1, -10, 0, 28), UDim2.new(0, 5, 0, 40), Color3.fromRGB(40, 40, 40), "Alvo: Nenhum selecionado", Color3.new(1, 1, 0), Enum.Font.SourceSansBold
-Instance.new("UICorner", StatusLabel)
+StatusLabel.Size = UDim2.new(1, -16, 0, 30)
+StatusLabel.Position = UDim2.new(0, 8, 0, 43)
+StatusLabel.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
+StatusLabel.Text = "Alvo: Nenhum selecionado"
+StatusLabel.TextColor3 = Color3.fromRGB(255, 220, 0)
+StatusLabel.Font = Enum.Font.SourceSansBold
+StatusLabel.TextSize = 13
+Instance.new("UICorner", StatusLabel).CornerRadius = UDim.new(0, 6)
 
--- Botão de Auto-Equip e Disparo Teleguiado
+-- Botão de Ação (Equip & Disparar)
 local FireBtn = Instance.new("TextButton", Main)
-FireBtn.Size, FireBtn.Position, FireBtn.BackgroundColor3, FireBtn.Text, FireBtn.TextColor3, FireBtn.Font = UDim2.new(1, -10, 0, 32), UDim2.new(0, 5, 0, 75), Color3.fromRGB(0, 100, 160), "EQUIPAR & DISPARAR NO ALVO", Color3.new(1, 1, 1), Enum.Font.SourceSansBold
-Instance.new("UICorner", FireBtn)
+FireBtn.Size = UDim2.new(1, -16, 0, 38)
+FireBtn.Position = UDim2.new(0, 8, 0, 80)
+FireBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+FireBtn.Text = "EQUIPAR & DISPARAR NO ALVO"
+FireBtn.TextColor3 = Color3.new(1, 1, 1)
+FireBtn.Font = Enum.Font.SourceSansBold
+FireBtn.TextSize = 14
+Instance.new("UICorner", FireBtn).CornerRadius = UDim.new(0, 6)
 
--- Lógica Robusta de Auto-Equip e Disparo com Tolerância a Latência
+-- Container da Lista de Jogadores (ScrollingFrame)
+local Scroll = Instance.new("ScrollingFrame", Main)
+Scroll.Size = UDim2.new(1, -16, 0, 250)
+Scroll.Position = UDim2.new(0, 8, 0, 125)
+Scroll.BackgroundTransparency = 1
+Scroll.BorderSizePixel = 0
+Scroll.ScrollBarThickness = 5
+Scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+local UIList = Instance.new("UIListLayout", Scroll)
+UIList.Padding = UDim.new(0, 5)
+UIList.SortOrder = Enum.SortOrder.LayoutOrder
+
+UIList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    Scroll.CanvasSize = UDim2.new(0, 0, 0, UIList.AbsoluteContentSize.Y + 10)
+end)
+
+-- Lógica de Auto-Equip e Disparo com Remotes
 local function equipAndFireTornado()
     if not remoteAvatar then
-        StatusLabel.Text = "Erro: Remote AvatarMainRE não achado!"
-        StatusLabel.TextColor3 = Color3.new(1, 0, 0)
+        StatusLabel.Text = "Erro: Remote AvatarMainRE não encontrado!"
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 60, 60)
         return
     end
 
     StatusLabel.Text = "Equipando gear..."
-    StatusLabel.TextColor3 = Color3.new(1, 0.5, 0)
+    StatusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
 
+    -- Aciona o remote de equip do gear
     remoteAvatar:FireServer({["id"] = gearTornadoID, ["event"] = "equip", ["equiptype"] = "Gear"})
 
     task.spawn(function()
@@ -54,7 +94,7 @@ local function equipAndFireTornado()
         local gearFolder = nil
 
         local startTime = tick()
-        while tick() - startTime < 2 do
+        while tick() - startTime < 2.5 do
             gearFolder = char:FindFirstChild(gearName)
             if gearFolder then break end
             task.wait(0.05)
@@ -62,60 +102,38 @@ local function equipAndFireTornado()
 
         if gearFolder then
             local remoteEvent = gearFolder:FindFirstChild("RemoteEvent") or gearFolder:FindFirstChildOfClass("RemoteEvent")
-            
             if remoteEvent then
-                local args = {
-                    [1] = "DO THE THING!!!"
-                }
+                local args = { [1] = "DO THE THING!!!" }
                 pcall(function()
                     remoteEvent:FireServer(unpack(args))
                 end)
                 StatusLabel.Text = "Tornado disparado com sucesso!"
-                StatusLabel.TextColor3 = Color3.new(0, 1, 0)
+                StatusLabel.TextColor3 = Color3.fromRGB(60, 255, 60)
             else
-                StatusLabel.Text = "Erro: RemoteEvent interno não achado!"
-                StatusLabel.TextColor3 = Color3.new(1, 0, 0)
+                StatusLabel.Text = "Erro: RemoteEvent interno ausente!"
+                StatusLabel.TextColor3 = Color3.fromRGB(255, 60, 60)
             end
         else
-            StatusLabel.Text = "Erro: O servidor demorou para equipar!"
-            StatusLabel.TextColor3 = Color3.new(1, 0, 0)
+            StatusLabel.Text = "Erro: Tempo esgotado ao equipar!"
+            StatusLabel.TextColor3 = Color3.fromRGB(255, 60, 60)
         end
     end)
 end
 
 FireBtn.MouseButton1Click:Connect(function()
     if not selectedTarget then
-        StatusLabel.Text = "Selecione um alvo na lista!"
-        StatusLabel.TextColor3 = Color3.new(1, 0, 0)
+        StatusLabel.Text = "Selecione um alvo na lista abaixo!"
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 60, 60)
         return
     end
     equipAndFireTornado()
 end)
 
--- LISTA DE JOGADORES (ScrollingFrame Corrigido e Ajustado)
-local Scroll = Instance.new("ScrollingFrame", Main)
-Scroll.Size = UDim2.new(1, -10, 0, 265)
-Scroll.Position = UDim2.new(0, 5, 0, 115)
-Scroll.BackgroundTransparency = 1
-Scroll.BorderSizePixel = 0
-Scroll.ScrollBarThickness = 6
-Scroll.ClipsDescendants = true
-Scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-
-local Layout = Instance.new("UIListLayout", Scroll)
-Layout.Padding = UDim.new(0, 5)
-Layout.SortOrder = Enum.SortOrder.LayoutOrder
-
-Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    Scroll.CanvasSize = UDim2.new(0, 0, 0, Layout.AbsoluteContentSize.Y + 10)
-end)
-
--- MONITOR DE TORNADO (Intercepta, altera velocidade, força e direciona para o alvo)
+-- Monitor Teleguiado para Redirecionar o Tornado
 Workspace.ChildAdded:Connect(function(child)
     if child.Name == "Tornado" and selectedTarget then
         task.spawn(function()
-            task.wait(0.05)
-            
+            task.wait(0.04)
             local tChar = selectedTarget.Character
             local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
             
@@ -123,9 +141,8 @@ Workspace.ChildAdded:Connect(function(child)
                 local bodyVel = child:FindFirstChildOfClass("BodyVelocity")
                 if bodyVel then
                     local direction = (tRoot.Position - child.Position).Unit
-                    bodyVel.Velocity = direction * 220
+                    bodyVel.Velocity = direction * 230
                 end
-                
                 pcall(function()
                     child.CFrame = CFrame.new(child.Position, tRoot.Position)
                 end)
@@ -134,37 +151,33 @@ Workspace.ChildAdded:Connect(function(child)
     end
 end)
 
--- Atualizar Lista de Jogadores Dinamicamente sem bugs
-local function updateList()
-    for _, child in ipairs(Scroll:GetChildren()) do 
-        if child:IsA("Frame") then child:Destroy() end 
+-- Preenchimento Dinâmico da Lista de Alvos
+local function updatePlayerList()
+    for _, child in ipairs(Scroll:GetChildren()) do
+        if child:IsA("TextButton") then child:Destroy() end
     end
-    
+
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= localPlayer then
-            local Item = Instance.new("Frame", Scroll)
-            Item.Size = UDim2.new(1, -6, 0, 36)
-            Item.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-            Instance.new("UICorner", Item)
+            local ItemBtn = Instance.new("TextButton", Scroll)
+            ItemBtn.Size = UDim2.new(1, -4, 0, 36)
+            ItemBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+            ItemBtn.Text = "   " .. plr.Name
+            ItemBtn.TextColor3 = Color3.new(1, 1, 1)
+            ItemBtn.Font = Enum.Font.SourceSansBold
+            ItemBtn.TextSize = 14
+            ItemBtn.TextXAlignment = Enum.TextXAlignment.Left
+            Instance.new("UICorner", ItemBtn).CornerRadius = UDim.new(0, 6)
 
-            local Btn = Instance.new("TextButton", Item)
-            Btn.Size = UDim2.new(1, 0, 1, 0)
-            Btn.BackgroundTransparency = 1
-            Btn.Text = "  " .. plr.Name
-            Btn.TextColor3 = Color3.new(1, 1, 1)
-            Btn.TextXAlignment = Enum.TextXAlignment.Left
-            Btn.Font = Enum.Font.SourceSansBold
-            Btn.TextSize = 14
-
-            Btn.MouseButton1Click:Connect(function()
+            ItemBtn.MouseButton1Click:Connect(function()
                 selectedTarget = plr
                 StatusLabel.Text = "Alvo: " .. plr.Name
-                StatusLabel.TextColor3 = Color3.new(0, 1, 0)
+                StatusLabel.TextColor3 = Color3.fromRGB(60, 255, 60)
             end)
         end
     end
 end
 
-Players.PlayerAdded:Connect(updateList)
-Players.PlayerRemoving:Connect(updateList)
-updateList()
+Players.PlayerAdded:Connect(updatePlayerList)
+Players.PlayerRemoving:Connect(updatePlayerList)
+updatePlayerList()
