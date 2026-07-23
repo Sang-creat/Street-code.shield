@@ -1,206 +1,262 @@
+-- Serviços necessários
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
-local CoreGui = game:GetService("CoreGui")
+local RunService = game:GetService("RunService")
 
-local localPlayer = Players.LocalPlayer
-local parentGui = (pcall(function() return CoreGui:IsA("GuiService") end) and CoreGui) or localPlayer:WaitForChild("PlayerGui")
+local LocalPlayer = Players.LocalPlayer
 
-if parentGui:FindFirstChild("SuperRingHub") then
-    parentGui.SuperRingHub:Destroy()
-end
+-- Configurações do Gear
+local GEAR_ID = 127506257
+local GEAR_NAME = "Gear" .. GEAR_ID
+local REMOTE_AVATAR = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("AvatarMainRE")
 
 -- Variáveis de Estado
-local isEnabled = false
+local isRunning = false
 local selectedTarget = nil
-local gearTornadoID = 127506257
+local lastShotTick = 0
+local COOLDOWN_TIME = 3.5 -- Ajuste conforme o cooldown real do gear no jogo
 
--- Remote principal (mesma estrutura do seu exemplo)
-local remotesFolder = ReplicatedStorage:WaitForChild("Remotes", 5)
-local avatarRemote = remotesFolder and remotesFolder:WaitForChild("AvatarMainRE", 5)
-
--- Criação da Interface GUI (Mobile otimizada)
-local ScreenGui = Instance.new("ScreenGui", parentGui)
-ScreenGui.Name = "SuperRingHub"
+-----------------------------------------------------------------
+-- CRIAÇÃO DA INTERFACE GRÁFICA (GUI)
+-----------------------------------------------------------------
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "TornadoScriptGui"
 ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
-local Main = Instance.new("Frame", ScreenGui)
-Main.Size = UDim2.new(0, 290, 0, 430)
-Main.Position = UDim2.new(0.5, -145, 0.5, -215)
-Main.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
-Main.Draggable = true
-Main.Active = true
-Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10)
+-- Janela Principal
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 320, 0, 380)
+MainFrame.Position = UDim2.new(0.5, -160, 0.5, -190)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
 
 -- Título
-local Title = Instance.new("TextLabel", Main)
-Title.Size = UDim2.new(1, 0, 0, 38)
-Title.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
-Title.Text = "  Super Ring - Tornado Hub"
-Title.TextColor3 = Color3.new(1, 1, 1)
-Title.Font = Enum.Font.SourceSansBold
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+Title.Text = "Controle de Tornado - RP"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 16
-Title.TextXAlignment = Enum.TextXAlignment.Left
-Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 10)
+Title.Font = Enum.Font.SourceSansBold
+Title.Parent = MainFrame
 
--- Status / Alvo Atual
-local StatusLabel = Instance.new("TextLabel", Main)
-StatusLabel.Size = UDim2.new(1, -16, 0, 28)
-StatusLabel.Position = UDim2.new(0, 8, 0, 46)
-StatusLabel.BackgroundColor3 = Color3.fromRGB(38, 38, 46)
-StatusLabel.Text = "Alvo: Nenhum selecionado"
-StatusLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
-StatusLabel.Font = Enum.Font.SourceSansBold
-StatusLabel.TextSize = 13
-Instance.new("UICorner", StatusLabel).CornerRadius = UDim.new(0, 6)
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 8)
+TitleCorner.Parent = Title
 
--- Botão Liga/Desliga do Super Ring
-local ToggleBtn = Instance.new("TextButton", Main)
-ToggleBtn.Size = UDim2.new(1, -16, 0, 36)
-ToggleBtn.Position = UDim2.new(0, 8, 0, 80)
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
-ToggleBtn.Text = "SUPER RING: DESLIGADO"
-ToggleBtn.TextColor3 = Color3.new(1, 1, 1)
-ToggleBtn.Font = Enum.Font.SourceSansBold
-ToggleBtn.TextSize = 14
-Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 6)
+-- Botão ON/OFF
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Size = UDim2.new(0.9, 0, 0, 40)
+ToggleButton.Position = UDim2.new(0.05, 0, 0, 55)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+ToggleButton.Text = "Função: OFF"
+ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleButton.TextSize = 15
+ToggleButton.Font = Enum.Font.SourceSansBold
+ToggleButton.Parent = MainFrame
+
+local ToggleCorner = Instance.new("UICorner")
+ToggleCorner.CornerRadius = UDim.new(0, 6)
+ToggleCorner.Parent = ToggleButton
+
+-- Label Lista de Alvos
+local TargetLabel = Instance.new("TextLabel")
+TargetLabel.Size = UDim2.new(0.9, 0, 0, 25)
+TargetLabel.Position = UDim2.new(0.05, 0, 0, 105)
+TargetLabel.BackgroundTransparency = 1
+TargetLabel.Text = "Selecione o Alvo (Clique no Jogador):"
+TargetLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+TargetLabel.TextSize = 14
+TargetLabel.Font = Enum.Font.SourceSans
+TargetLabel.TextXAlignment = Enum.TextXAlignment.Left
+TargetLabel.Parent = MainFrame
 
 -- ScrollingFrame para Lista de Jogadores
-local Scroll = Instance.new("ScrollingFrame", Main)
-Scroll.Size = UDim2.new(1, -16, 0, 280)
-Scroll.Position = UDim2.new(0, 8, 0, 126)
-Scroll.BackgroundTransparency = 1
-Scroll.BorderSizePixel = 0
-Scroll.ScrollBarThickness = 5
-Scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+local ScrollingFrame = Instance.new("ScrollingFrame")
+ScrollingFrame.Size = UDim2.new(0.9, 0, 0, 185)
+ScrollingFrame.Position = UDim2.new(0.05, 0, 0, 135)
+ScrollingFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+ScrollingFrame.BorderSizePixel = 0
+ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+ScrollingFrame.Parent = MainFrame
 
-local UIList = Instance.new("UIListLayout", Scroll)
-UIList.Padding = UDim.new(0, 6)
-UIList.SortOrder = Enum.SortOrder.LayoutOrder
+local ScrollCorner = Instance.new("UICorner")
+ScrollCorner.CornerRadius = UDim.new(0, 6)
+ScrollCorner.Parent = ScrollingFrame
 
-UIList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    Scroll.CanvasSize = UDim2.new(0, 0, 0, UIList.AbsoluteContentSize.Y + 10)
-end)
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 4)
+UIListLayout.Parent = ScrollingFrame
 
--- Lógica Unificada do Poder do Tornado
-local function triggerSuperRing()
-    if not avatarRemote then return end
+-----------------------------------------------------------------
+-- FUNÇÕES DE LOGICA DO SCRIPT
+-----------------------------------------------------------------
 
-    -- 1. Requisição de equipar o gear via AvatarMainRE (seguindo exatamente a lógica fornecida)
-    local equipArgs = {
+-- Função para equipar o gear via Remote capturado
+local function equipGear()
+    local args = {
         [1] = {
-            ["event"] = "EquipGear",
-            ["id"] = gearTornadoID
+            ["id"] = GEAR_ID,
+            ["event"] = "equip",
+            ["equiptype"] = "Gear"
         }
     }
-    
     pcall(function()
-        avatarRemote:FireServer(unpack(equipArgs))
+        REMOTE_AVATAR:FireServer(unpack(args))
     end)
-
-    -- Pequena pausa para sincronização do servidor
-    task.wait(0.1)
-
-    -- 2. Dispara o RemoteEvent interno do gear ("DO THE THING!!!")
-    local char = localPlayer.Character
-    if char then
-        local gearFolder = char:FindFirstChild("Gear" .. gearTornadoID)
-        if gearFolder then
-            local remoteEvent = gearFolder:FindFirstChild("RemoteEvent")
-            if remoteEvent then
-                local fireArgs = { [1] = "DO THE THING!!!" }
-                pcall(function()
-                    remoteEvent:FireServer(unpack(fireArgs))
-                end)
-            end
-        end
-    end
 end
 
--- Monitoramento em tempo real do Workspace para capturar o "Tornado" gerado
-Workspace.ChildAdded:Connect(function(child)
-    if isEnabled and child.Name == "Tornado" and selectedTarget then
-        task.spawn(function()
-            task.wait(0.02) -- Aguarda os componentes físicos carregarem no Workspace
-            
-            local tChar = selectedTarget.Character
-            local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
-            
-            if tRoot and child and child.Parent then
-                -- Ajusta a velocidade e força do BodyVelocity para perseguir instantaneamente o alvo
-                local bodyVel = child:FindFirstChildOfClass("BodyVelocity")
-                if bodyVel then
-                    local direction = (tRoot.Position - child.Position).Unit
-                    bodyVel.Velocity = direction * 300
-                end
-                
-                -- Altera o CFrame para direcionar o frame do tornado nas coordenadas do alvo
-                pcall(function()
-                    child.CFrame = CFrame.new(child.Position, tRoot.Position)
-                end)
-            end
-        end)
-    end
-end)
-
--- Loop de Repetição Automática baseada no Cooldown e Chave Ligada
-task.spawn(function()
-    while true do
-        if isEnabled and selectedTarget then
-            local tChar = selectedTarget.Character
-            local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
-            
-            if tRoot then
-                pcall(triggerSuperRing)
-            end
-            
-            -- Tempo de espera equivalente ao cooldown do gear
-            task.wait(3.5)
-        else
-            task.wait(0.4)
-        end
-    end
-end)
-
--- Ação do Botão Liga/Desliga da Interface
-ToggleBtn.MouseButton1Click:Connect(function()
-    isEnabled = not isEnabled
-    if isEnabled then
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 160, 60)
-        ToggleBtn.Text = "SUPER RING: LIGADO"
-    else
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
-        ToggleBtn.Text = "SUPER RING: DESLIGADO"
-    end
-end)
-
--- Popular Lista de Jogadores na GUI
-local function updatePlayerList()
-    for _, child in ipairs(Scroll:GetChildren()) do
-        if child:IsA("TextButton") then child:Destroy() end
-    end
-
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= localPlayer then
-            local ItemBtn = Instance.new("TextButton", Scroll)
-            ItemBtn.Size = UDim2.new(1, -4, 0, 36)
-            ItemBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-            ItemBtn.Text = "   " .. plr.Name
-            ItemBtn.TextColor3 = Color3.new(1, 1, 1)
-            ItemBtn.Font = Enum.Font.SourceSansBold
-            ItemBtn.TextSize = 14
-            ItemBtn.TextXAlignment = Enum.TextXAlignment.Left
-            Instance.new("UICorner", ItemBtn).CornerRadius = UDim.new(0, 6)
-
-            ItemBtn.MouseButton1Click:Connect(function()
-                selectedTarget = plr
-                StatusLabel.Text = "Alvo: " .. plr.Name
-                StatusLabel.TextColor3 = Color3.fromRGB(60, 255, 60)
+-- Função para disparar o poder do gear
+local function fireGearPower()
+    local character = LocalPlayer.Character
+    if character and character:FindFirstChild(GEAR_NAME) then
+        local gearItem = character[GEAR_NAME]
+        local remoteEvent = gearItem:FindFirstChild("RemoteEvent")
+        if remoteEvent then
+            pcall(function()
+                remoteEvent:FireServer("DO THE THING!!!")
             end)
         end
     end
 end
 
+-- Atualizar dinamicamente a lista de jogadores na UI
+local function updatePlayerList()
+    -- Limpar botões antigos
+    for _, child in ipairs(ScrollingFrame:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
+        end
+    end
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local pButton = Instance.new("TextButton")
+            pButton.Size = UDim2.new(1, -10, 0, 30)
+            pButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+            pButton.Text = player.Name
+            pButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+            pButton.TextSize = 14
+            pButton.Font = Enum.Font.SourceSans
+            pButton.Parent = ScrollingFrame
+
+            local btnCorner = Instance.new("UICorner")
+            btnCorner.CornerRadius = UDim.new(0, 4)
+            btnCorner.Parent = pButton
+
+            pButton.MouseButton1Click:Connect(function()
+                selectedTarget = player
+                -- Destacar visualmente o alvo selecionado
+                for _, btn in ipairs(ScrollingFrame:GetChildren()) do
+                    if btn:IsA("TextButton") then
+                        btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+                    end
+                end
+                pButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+            end)
+        end
+    end
+    ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y)
+end
+
 Players.PlayerAdded:Connect(updatePlayerList)
 Players.PlayerRemoving:Connect(updatePlayerList)
 updatePlayerList()
+
+-- Botão Liga/Desliga
+ToggleButton.MouseButton1Click:Connect(function()
+    isRunning = not isRunning
+    if isRunning then
+        ToggleButton.Text = "Função: ON"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+    else
+        ToggleButton.Text = "Função: OFF"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+    end
+end)
+
+-----------------------------------------------------------------
+-- TAREFAS DE BACKGROUND (LOOP INTELIGENTE)
+-----------------------------------------------------------------
+
+-- 1. Checagem e Auto-Equip a cada 2 segundos (caso morra ou perca o item)
+task.spawn(function()
+    while true do
+        task.wait(2)
+        if isRunning then
+            local char = LocalPlayer.Character
+            if char and not char:FindFirstChild(GEAR_NAME) then
+                equipGear()
+            end
+        end
+    end
+end)
+
+-- 2. Loop principal de Disparo e Direcionamento para o Alvo
+task.spawn(function()
+    while true-- Ticks e pausas estruturadas para evitar sobrecarga
+    task.wait(0.5)
+    
+    if isRunning and selectedTarget and selectedTarget.Character then
+        local targetChar = selectedTarget.Character
+        local targetRoot = targetChar:FindFirstChild("HumanoidRootPart") or targetChar:FindFirstChild("Head")
+        
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild(GEAR_NAME) then
+            -- Verifica se o cooldown permitira o disparo
+            if tick() - lastShotTick >= COOLDOWN_TIME then
+                -- Dispara o poder
+                fireGearPower()
+                lastShotTick = tick()
+                
+                -- Aguarda a renderização e aparição do modelo "Tornado" no Workspace
+                local tornadoInstance = nil
+                local startTime = tick()
+                
+                repeat
+                    tornadoInstance = Workspace:FindFirstChild("Tornado")
+                    task.wait(0.05)
+                until tornadoInstance or (tick() - startTime) > 1.5 -- Timeout de 1.5s para achar
+                
+                -- Se o tornado formou no workspace e temos um alvo válido, teleporta/direciona instantaneamente para o CFrame do alvo
+                if tornadoInstance and targetRoot then
+                    task.wait(0.2) -- Tempo hábil para o script nativo do jogo carregar o BodyForce/BodyVelocity
+                    
+                    if tornadoInstance:IsA("Model") then
+                        trySetModelCFrame(tornadoInstance, targetRoot.CFrame + Vector3.new(0, 3, 0))
+                    elseif tornadoInstance:IsA("BasePart") then
+                        tornadoInstance.CFrame = targetRoot.CFrame + Vector3.new(0, 3, 0)
+                    end
+                end
+            end
+        end
+    end
+end
+end)
+
+-- Função auxiliar segura para mover o modelo inteiro do Tornado para o alvo
+function trySetModelCFrame(model, targetCFrame)
+    pcall(function()
+        if model.PrimaryPart then
+            model:SetPrimaryPartCFrame(targetCFrame)
+        else
+            -- Se não tiver PrimaryPart definida, move a primeira parte encontrada ou o corpo principal
+            for _, part in ipairs(model:GetChildren()) do
+                if part:IsA("BasePart") then
+                    part.CFrame = targetCFrame
+                    break
+                end
+            end
+        end
+    end)
+end
