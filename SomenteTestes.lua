@@ -51,15 +51,19 @@ LoopToggleBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Lista de Jogadores (ScrollingFrame com ajuste automático corrigido)
+-- Lista de Jogadores (ScrollingFrame)
 local Scroll = Instance.new("ScrollingFrame", Main)
 Scroll.Size, Scroll.Position, Scroll.BackgroundTransparency, Scroll.ScrollBarThickness = UDim2.new(1, -10, 1, -85), UDim2.new(0, 5, 0, 80), true, 6
-Scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 Scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 
 local Layout = Instance.new("UIListLayout", Scroll)
-Layout.Padding = UDim.new(0, 5)
+Layout.Padding = UDim.new(0, 6)
 Layout.SortOrder = Enum.SortOrder.LayoutOrder
+
+-- Atualiza o tamanho da rolagem automaticamente baseada nos elementos gerados
+Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    Scroll.CanvasSize = UDim2.new(0, 0, 0, Layout.AbsoluteContentSize.Y + 10)
+end)
 
 -- FUNÇÃO CHAVE: Forçar o carregamento da área via BuildRE antes de interagir
 local function forceLoadArea(targetPosition)
@@ -135,11 +139,14 @@ local function updateList()
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= localPlayer then
             local Item = Instance.new("Frame", Scroll)
-            Item.Size, Item.BackgroundColor3 = UDim2.new(1, -5, 0, 35), Color3.fromRGB(50, 50, 50)
+            Item.Size = UDim2.new(1, -12, 0, 36)
+            Item.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
             Instance.new("UICorner", Item)
 
             local Btn = Instance.new("TextButton", Item)
-            Btn.Size, Btn.BackgroundTransparency, Btn.Text = UDim2.new(1, 0, 1, 0), true, "  " .. plr.Name
+            Btn.Size = UDim2.new(1, 0, 1, 0)
+            Btn.BackgroundTransparency = 1
+            Btn.Text = "  " .. plr.Name
             Btn.TextColor3 = Color3.new(1, 1, 1)
             Btn.TextXAlignment = Enum.TextXAlignment.Left
             Btn.Font = Enum.Font.SourceSansBold
