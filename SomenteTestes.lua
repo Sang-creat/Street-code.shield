@@ -3,11 +3,12 @@ local LocalPlayer = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CoreGui = game:GetService("CoreGui")
 
--- Remove instâncias antigas
+-- Remove instâncias anteriores para evitar duplicidade ao reinjetar
 if CoreGui:FindFirstChild("TornadoGUI") then
     CoreGui.TornadoGUI:Destroy()
 end
 
+-- Configuração da Interface Gráfica (Mantendo o modelo anterior otimizado)
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "TornadoGUI"
 screenGui.ResetOnSpawn = false
@@ -42,7 +43,7 @@ toggleBtn.Font = Enum.Font.SourceSansBold
 toggleBtn.TextSize = 15
 toggleBtn.Parent = mainFrame
 
--- Label de Status do Alvo
+-- Label de Exibição do Alvo Selecionado
 local targetLabel = Instance.new("TextLabel")
 targetLabel.Size = UDim2.new(0.9, 0, 0, 25)
 targetLabel.Position = UDim2.new(0.05, 0, 0.30, 0)
@@ -53,7 +54,7 @@ targetLabel.Font = Enum.Font.SourceSans
 targetLabel.TextSize = 13
 targetLabel.Parent = mainFrame
 
--- ScrollingFrame para a lista de jogadores
+-- ScrollingFrame para a Lista de Jogadores
 local scrollingFrame = Instance.new("ScrollingFrame")
 scrollingFrame.Size = UDim2.new(0.9, 0, 0.53, 0)
 scrollingFrame.Position = UDim2.new(0.05, 0, 0.41, 0)
@@ -71,11 +72,13 @@ uiListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, uiListLayout.AbsoluteContentSize.Y + 10)
 end)
 
+-- Variáveis de Estado
 local running = false
 local selectedTarget = nil
+local gearId = 102705454
 local avatarMainRE = ReplicatedStorage:WaitForChild("AvatarMainRE", 5)
 
--- Evento do Toggle com suporte garantido a clique mobile
+-- Gerenciamento do Toggle (Liga/Desliga)
 toggleBtn.MouseButton1Click:Connect(function()
     running = not running
     if running then
@@ -87,16 +90,14 @@ toggleBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Função segura para popular a lista de jogadores
+-- Preenchimento Dinâmico da Lista de Jogadores
 local function updatePlayerList()
-    -- Limpa os botões antigos
     for _, child in ipairs(scrollingFrame:GetChildren()) do
         if child:IsA("TextButton") then
             child:Destroy()
         end
     end
     
-    -- Adiciona todos os jogadores atuais do servidor
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
             local pBtn = Instance.new("TextButton")
@@ -121,45 +122,70 @@ Players.PlayerAdded:Connect(updatePlayerList)
 Players.PlayerRemoving:Connect(updatePlayerList)
 updatePlayerList()
 
--- Loop principal automatizado
+-- Loop Principal de Controle: Auto-Equip, Aim-Lock e Disparos Automáticos em Cadeia
 task.spawn(function()
     while true do
+        -- O ciclo só opera estritamente se a chave estiver ON e houver um alvo selecionado
         if running and selectedTarget and avatarMainRE then
-            pcall(function()
-                avatarMainRE:FireServer({
-                    ["id"] = 102705454,
-                    ["event"] = "equip",
-                    ["equiptype"] = "Gear"
-                })
-            end)
-            
-            task.wait(1)
-            
             local character = LocalPlayer.Character
-            local backpack = LocalPlayer.Backpack
-            local tool = character and character:FindFirstChild("Gear102705454") or backpack:FindFirstChild("Gear102705454")
+            local humanoid = character and character:FindFirstChildOfClass("Humanoid")
             
-            if tool and tool.Parent == backpack then
-                tool.Parent = character
+            -- Valida se o personagem está vivo e se o gear já está equipado no slot/mão
+            local equippedTool = character and character:FindFirstChild("Gear" .. gearId)
+            
+            if not equippedTool or not humanoid or humanoid.Health <= 0 then
+                -- Auto-Equip via Remote mapeado se o gear não estiver equipado
+                pcall(function()
+                    avatarMainRE:FireServer({
+                        ["id"] = gearId,
+                        ["event"] = "equip",
+                        ["equiptype"] = "Gear"
+                    })
+                end)
+                task.wait(1.5) -- Pausa para o servidor processar a entrega do gear na mochila
+                
+                character = LocalPlayer.Character
+                local backpack = LocalPlayer.Backpack
+                local toolInBackpack = backpack and backpack:FindFirstChild("Gear" .. gearId)
+                
+                -- Se o item caiu na mochila, puxa para o personagem (slot ativo)
+                if toolInBackpack and character then
+                    toolInBackpack.Parent = character
+                end
             end
             
-            while running and selectedTarget and selectedTarget.Character and selectedTarget.Character:FindFirstChild("HumanoidRootPart") do
-                local myRoot = character and character:FindFirstChild("HumanoidRootPart")
-                local targetRoot = selectedTarget.Character.HumanoidRootPart
-                
-                if myRoot then
-                    myRoot.CFrame = CFrame.new(myRoot.Position, Vector3.new(targetRoot.Position.X, myRoot.Position.Y, targetRoot.Position.Z))
+            -- Revalidação da ferramenta equipada para os disparos
+            character = LocalPlayer.Character
+            local activeTool = character and character:FindFirstChild("Gear" .. gearId)
+            
+            if activeTool then
+                -- Executa a rotina de Aim-Lock e Disparos em Cadeia a cada 2 segundos
+                while running and selectedTarget and selectedTarget.Character and selectedTarget.Character:FindFirstChild("HumanoidRootPart") do
+                    local myRoot = character and character:FindFirstChild("HumanoidRootPart")
+                    local targetRoot = selectedTarget.Character.HumanoidRootPart
+                    
+                    -- Sistema Aim-Lock: Vira instantaneamente o personagem para o alvo
+                    if myRoot then
+                        myRoot.CFrame = CFrame.new(myRoot.Position, Vector3.new(targetRoot.Position.X, myRoot.Position.Y, targetRoot.Position.Z))
+                    end
+                    
+                    -- Simula o toque/clique para disparar o gear automaticamente
+                    if activeTool.Parent == character then
+                        pcall(function()
+                            activeTool:Activate()
+                        end)
+                    else
+                        -- Se por algum motivo o gear saiu do slot, força a saída do loop interno para reequipar
+                        break
+                    end
+                    
+                    -- Respeita o intervalo estipulado de 2 segundos entre cada disparo de tornado
+                    task.wait(2)
                 end
-                
-                if tool and tool.Parent == character then
-                    pcall(function()
-                        tool:Activate()
-                    end)
-                end
-                
-                task.wait(2)
             end
         end
-        task.wait(0.5)
+        
+        -- Autochecagem geral a cada 2 segundos (garante resiliência contra mortes e trocas de estado)
+        task.wait(2)
     end
 end)
