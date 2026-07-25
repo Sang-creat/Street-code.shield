@@ -3,7 +3,7 @@ local LocalPlayer = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CoreGui = game:GetService("CoreGui")
 
--- Remove instâncias antigas para evitar duplicidade
+-- Remove instâncias antigas
 if CoreGui:FindFirstChild("TornadoGUI") then
     CoreGui.TornadoGUI:Destroy()
 end
@@ -42,7 +42,7 @@ toggleBtn.Font = Enum.Font.SourceSansBold
 toggleBtn.TextSize = 15
 toggleBtn.Parent = mainFrame
 
--- Label de Status do Alvo Selecionado
+-- Label de Status do Alvo
 local targetLabel = Instance.new("TextLabel")
 targetLabel.Size = UDim2.new(0.9, 0, 0, 25)
 targetLabel.Position = UDim2.new(0.05, 0, 0.30, 0)
@@ -53,10 +53,10 @@ targetLabel.Font = Enum.Font.SourceSans
 targetLabel.TextSize = 13
 targetLabel.Parent = mainFrame
 
--- Lista de Jogadores (ScrollingFrame)
+-- ScrollingFrame para a lista de jogadores
 local scrollingFrame = Instance.new("ScrollingFrame")
-scrollingFrame.Size = UDim2.new(0.9, 0, 0.55, 0)
-scrollingFrame.Position = UDim2.new(0.05, 0, 0.40, 0)
+scrollingFrame.Size = UDim2.new(0.9, 0, 0.53, 0)
+scrollingFrame.Position = UDim2.new(0.05, 0, 0.41, 0)
 scrollingFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 scrollingFrame.BorderSizePixel = 0
 scrollingFrame.ScrollBarThickness = 6
@@ -65,18 +65,17 @@ scrollingFrame.Parent = mainFrame
 local uiListLayout = Instance.new("UIListLayout")
 uiListLayout.Parent = scrollingFrame
 uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-uiListLayout.Padding = UDim.new(0, 6)
+uiListLayout.Padding = UDim.new(0, 5)
 
--- Atualiza o tamanho do Canvas automaticamente conforme os itens entram
 uiListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, uiListLayout.AbsoluteContentSize.Y + 10)
 end)
 
 local running = false
 local selectedTarget = nil
-local avatarMainRE = ReplicatedStorage:WaitForChild("AvatarMainRE")
+local avatarMainRE = ReplicatedStorage:WaitForChild("AvatarMainRE", 5)
 
--- Função do Toggle
+-- Evento do Toggle com suporte garantido a clique mobile
 toggleBtn.MouseButton1Click:Connect(function()
     running = not running
     if running then
@@ -88,14 +87,16 @@ toggleBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Popula a lista de jogadores
+-- Função segura para popular a lista de jogadores
 local function updatePlayerList()
+    -- Limpa os botões antigos
     for _, child in ipairs(scrollingFrame:GetChildren()) do
         if child:IsA("TextButton") then
             child:Destroy()
         end
     end
     
+    -- Adiciona todos os jogadores atuais do servidor
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
             local pBtn = Instance.new("TextButton")
@@ -120,10 +121,10 @@ Players.PlayerAdded:Connect(updatePlayerList)
 Players.PlayerRemoving:Connect(updatePlayerList)
 updatePlayerList()
 
--- Loop principal de Equip + Aim-Lock + Disparo
+-- Loop principal automatizado
 task.spawn(function()
     while true do
-        if running and selectedTarget then
+        if running and selectedTarget and avatarMainRE then
             pcall(function()
                 avatarMainRE:FireServer({
                     ["id"] = 102705454,
