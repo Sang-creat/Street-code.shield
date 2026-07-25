@@ -193,8 +193,8 @@ local function equipGear()
 	end
 end
 
--- Aim-Lock System
-aimLockConnection = RunService.RenderStepped:Connect(function()
+-- Smooth Aim-Lock System (Correção do travamento de movimento)
+aimLockConnection = RunService.RenderStepped:Connect(function(dt)
 	if isTornadoEnabled and selectedTarget and selectedTarget.Character then
 		local targetChar = selectedTarget.Character
 		local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
@@ -202,12 +202,18 @@ aimLockConnection = RunService.RenderStepped:Connect(function()
 		local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
 		
 		if targetRoot and myRoot then
-			myRoot.CFrame = CFrame.new(myRoot.Position, Vector3.new(targetRoot.Position.X, myRoot.Position.Y, targetRoot.Position.Z))
+			-- Calcula a direção apenas no plano horizontal (Y fixo para não inclinar o personagem)
+			local direction = Vector3.new(targetRoot.Position.X, myRoot.Position.Y, targetRoot.Position.Z) - myRoot.Position
+			if direction.Magnitude > 0.1 then
+				local targetCFrame = CFrame.new(myRoot.Position, myRoot.Position + direction)
+				-- Usa Slerp para girar suavemente sem quebrar a física de caminhada ou travar o boneco
+				myRoot.CFrame = myRoot.CFrame:Lerp(targetCFrame, math.clamp(dt * 15, 0, 1))
+			end
 		end
 	end
 end)
 
--- Main Tornado Loop Routine with Respawn & Custom Scale Adjustment
+-- Main Tornado Loop Routine with Circular Spawning & Scale Adjustment
 local function startTornadoRoutine()
 	task.spawn(function()
 		while isTornadoEnabled do
@@ -226,14 +232,35 @@ local function startTornadoRoutine()
 					task.wait(0.05)
 					VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
 					
-					-- Automatically scale spawned tornadoes in Workspace based on properties analyzed
+					-- Circular Spawning & Scale Modification for Workspace Tornadoes
 					task.spawn(function()
+						local radius = 10 
+						local angle = tick() * 5 
+
 						for _, obj in ipairs(Workspace:GetChildren()) do
-							if obj.Name == "TornadoMesh" or obj:FindFirstChild("TornadoMesh") then
+							if (obj.Name == "TornadoMesh" or obj:FindFirstChild("TornadoMesh")) and not obj:GetAttribute("CircularSet") then
+								obj:SetAttribute("CircularSet", true)
+								
+								local myChar = LocalPlayer.Character
+								local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+								
+								if myRoot and obj:IsA("BasePart") then
+									local offsetX = math.cos(angle) * radius
+									local offsetZ = math.sin(angle) * radius
+									local targetPos = myRoot.Position + Vector3.new(offsetX, 0, offsetZ)
+									
+									obj.CFrame = CFrame.new(targetPos)
+									
+									local bodyVel = obj:FindFirstChildOfClass("BodyVelocity")
+									if bodyVel then
+										bodyVel.Velocity = Vector3.new(offsetX, 0, offsetZ).Unit * 25
+									end
+								end
+
 								local mesh = obj:FindFirstChild("Mesh") or obj:FindFirstChildWhichIsA("SpecialMesh")
 								if mesh and not mesh:GetAttribute("ScaledCustom") then
 									mesh:SetAttribute("ScaledCustom", true)
-									mesh.Scale = Vector3.new(7, 9, 7) -- Ajuste personalizado opcional do tamanho
+									mesh.Scale = Vector3.new(7, 9, 7)
 								end
 							end
 						end
