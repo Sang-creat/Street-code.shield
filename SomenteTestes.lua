@@ -12,7 +12,7 @@ local GEAR_ID = 102705454
 local isTornadoEnabled = false
 local selectedTarget = nil
 local aimLockConnection = nil
-local stoppedTime = 0 -- Variável para contar o tempo que o jogador está parado
+local stoppedTime = 0
 
 -- Remotes
 local avatarMainRE = ReplicatedStorage:FindFirstChild("AvatarMainRE", true)
@@ -193,7 +193,7 @@ local function equipGear()
 	end
 end
 
--- Rotação Automática com Atraso (Espera meio segundo após parar para virar suavemente)
+-- Rotação Automática com Atraso Suavizada
 aimLockConnection = RunService.RenderStepped:Connect(function(dt)
 	if isTornadoEnabled and selectedTarget and selectedTarget.Character then
 		local targetChar = selectedTarget.Character
@@ -206,19 +206,15 @@ aimLockConnection = RunService.RenderStepped:Connect(function(dt)
 			local isMoving = humanoid.MoveDirection.Magnitude > 0.1
 			
 			if isMoving then
-				-- Se estiver andando, reseta o tempo de parada imediatamente
 				stoppedTime = 0
 			else
-				-- Se estiver parado, acumula o tempo que passou
 				stoppedTime = stoppedTime + dt
 				
-				-- Só começa a virar se estiver parado há mais de 0.5 segundos
 				if stoppedTime >= 0.5 then
 					local currentPos = myRoot.Position
 					local lookAtPos = Vector3.new(targetRoot.Position.X, currentPos.Y, targetRoot.Position.Z)
 					if (lookAtPos - currentPos).Magnitude > 1 then
 						local targetCFrame = CFrame.lookAt(currentPos, lookAtPos)
-						-- Reduzido para '6' para dar uma suavizada bem agradável na virada
 						myRoot.CFrame = myRoot.CFrame:Lerp(targetCFrame, math.clamp(dt * 6, 0, 1))
 					end
 				end
@@ -229,7 +225,7 @@ aimLockConnection = RunService.RenderStepped:Connect(function(dt)
 	end
 end)
 
--- Main Tornado Loop Routine
+-- Main Tornado Loop Routine com Verificação Contínua de Equipamento a Cada 2 Segundos
 local function startTornadoRoutine()
 	task.spawn(function()
 		while isTornadoEnabled do
@@ -237,17 +233,28 @@ local function startTornadoRoutine()
 			local humanoid = char:WaitForChild("Humanoid", 5)
 			
 			if humanoid then
-				task.wait(2)
-				if not isTornadoEnabled then break end
-				equipGear()
 				task.wait(1)
 				
 				while isTornadoEnabled and humanoid.Health > 0 do
+					-- Checa a cada ciclo se a Tool (Gear) está equipada no personagem ou mochila
+					local backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
 					local currentTool = char:FindFirstChildOfClass("Tool")
+					
+					if not currentTool or (currentTool.Name ~= "Tornado" and not currentTool:FindFirstChild("Handle")) then
+						equipGear()
+					end
+					
+					task.wait(2) -- Intervalo de checagem de 2 segundos conforme solicitado
+					
+					if not isTornadoEnabled or humanoid.Health <= 0 then break end
+					
+					-- Executa a ativação do tornado se a ferramenta estiver presente
+					currentTool = char:FindFirstChildOfClass("Tool")
 					if currentTool then
 						currentTool:Activate()
 					end
 					
+					-- Ajuste de escala e posicionamento dos tornados criados
 					task.spawn(function()
 						local radius = 10 
 						local angle = tick() * 5 
@@ -275,8 +282,6 @@ local function startTornadoRoutine()
 							end
 						end
 					end)
-					
-					task.wait(1.5)
 				end
 			end
 			
