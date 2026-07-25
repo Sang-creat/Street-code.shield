@@ -192,26 +192,34 @@ local function equipGear()
 	end
 end
 
--- Aim-Lock Leve (Usa apenas a propriedade CFrame do HumanoidRootPart sem travar o input de caminhada bruscamente)
-aimLockConnection = RunService.RenderStepped:Connect(function()
+-- Rotação Automática Apenas ao Parar (Olha para o alvo se estiver parado, livre se estiver andando)
+aimLockConnection = RunService.RenderStepped:Connect(function(dt)
 	if isTornadoEnabled and selectedTarget and selectedTarget.Character then
 		local targetChar = selectedTarget.Character
 		local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
 		local myChar = LocalPlayer.Character
 		local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+		local humanoid = myChar and myChar:FindFirstChildOfClass("Humanoid")
 		
-		if targetRoot and myRoot then
-			-- Faz apenas o personagem olhar para o alvo no plano horizontal sem corromper a velocidade de andar
-			local currentPos = myRoot.Position
-			local lookAtPos = Vector3.new(targetRoot.Position.X, currentPos.Y, targetRoot.Position.Z)
-			if (lookAtPos - currentPos).Magnitude > 1 then
-				myRoot.CFrame = CFrame.lookAt(currentPos, lookAtPos)
+		if targetRoot and myRoot and humanoid then
+			-- Verifica se o jogador NÃO está se movendo (MoveDirection Magnitude próximo de 0)
+			local isMoving = humanoid.MoveDirection.Magnitude > 0.1
+			
+			if not isMoving then
+				-- Se estiver parado, vira suavemente de frente para o alvo
+				local currentPos = myRoot.Position
+				local lookAtPos = Vector3.new(targetRoot.Position.X, currentPos.Y, targetRoot.Position.Z)
+				if (lookAtPos - currentPos).Magnitude > 1 then
+					local targetCFrame = CFrame.lookAt(currentPos, lookAtPos)
+					myRoot.CFrame = myRoot.CFrame:Lerp(targetCFrame, math.clamp(dt * 10, 0, 1))
+				end
 			end
+			-- Se estiver andando (`isMoving` = true), o script não mexe em nada, dando total liberdade de movimento.
 		end
 	end
 end)
 
--- Main Tornado Loop Routine (Sem cliques fantasmas na tela do Delta)
+-- Main Tornado Loop Routine
 local function startTornadoRoutine()
 	task.spawn(function()
 		while isTornadoEnabled do
@@ -225,13 +233,11 @@ local function startTornadoRoutine()
 				task.wait(1)
 				
 				while isTornadoEnabled and humanoid.Health > 0 do
-					-- Ativa a ferramenta diretamente pelo script de forma segura (sem simular toque na tela do executor)
 					local currentTool = char:FindFirstChildOfClass("Tool")
 					if currentTool then
 						currentTool:Activate()
 					end
 					
-					-- Ajuste de escala e posicionamento dos tornados criados
 					task.spawn(function()
 						local radius = 10 
 						local angle = tick() * 5 
