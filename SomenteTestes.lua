@@ -225,36 +225,42 @@ aimLockConnection = RunService.RenderStepped:Connect(function(dt)
 	end
 end)
 
--- Main Tornado Loop Routine com Verificação Contínua de Equipamento a Cada 2 Segundos
+-- Main Tornado Loop Routine (Resiliente a Respawn)
 local function startTornadoRoutine()
 	task.spawn(function()
+		-- Monitor contínuo acoplado ao ciclo de vida do jogador
 		while isTornadoEnabled do
 			local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 			local humanoid = char:WaitForChild("Humanoid", 5)
 			
 			if humanoid then
+				task.wait(1.5) -- Aguarda estabilizar o carregamento do personagem após o reset
+				if not isTornadoEnabled then break end
+				
+				equipGear()
 				task.wait(1)
 				
-				while isTornadoEnabled and humanoid.Health > 0 do
-					-- Checa a cada ciclo se a Tool (Gear) está equipada no personagem ou mochila
-					local backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
+				while isTornadoEnabled and humanoid.Health > 0 and LocalPlayer.Character == char do
+					-- Verificação a cada 2 segundos se a ferramenta está equipada ou no inventário
 					local currentTool = char:FindFirstChildOfClass("Tool")
+					local backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
 					
-					if not currentTool or (currentTool.Name ~= "Tornado" and not currentTool:FindFirstChild("Handle")) then
+					local hasGear = currentTool or (backpack and backpack:FindFirstChild("Gear"))
+					if not hasGear then
 						equipGear()
 					end
 					
-					task.wait(2) -- Intervalo de checagem de 2 segundos conforme solicitado
+					task.wait(2)
 					
-					if not isTornadoEnabled or humanoid.Health <= 0 then break end
+					if not isTornadoEnabled or humanoid.Health <= 0 or LocalPlayer.Character ~= char then break end
 					
-					-- Executa a ativação do tornado se a ferramenta estiver presente
+					-- Ativa a ferramenta se estiver na mão
 					currentTool = char:FindFirstChildOfClass("Tool")
 					if currentTool then
 						currentTool:Activate()
 					end
 					
-					-- Ajuste de escala e posicionamento dos tornados criados
+					-- Manipulação dos tornados criados no workspace
 					task.spawn(function()
 						local radius = 10 
 						local angle = tick() * 5 
@@ -285,8 +291,11 @@ local function startTornadoRoutine()
 				end
 			end
 			
+			-- Aguarda o personagem morrer ou resetar para reiniciar o ciclo limpo
 			if isTornadoEnabled and humanoid then
-				humanoid.Died:Wait()
+				pcall(function()
+					humanoid.Died:Wait()
+				end)
 			end
 			task.wait(1)
 		end
