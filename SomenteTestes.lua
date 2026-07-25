@@ -12,6 +12,7 @@ local GEAR_ID = 102705454
 local isTornadoEnabled = false
 local selectedTarget = nil
 local aimLockConnection = nil
+local stoppedTime = 0 -- Variável para contar o tempo que o jogador está parado
 
 -- Remotes
 local avatarMainRE = ReplicatedStorage:FindFirstChild("AvatarMainRE", true)
@@ -192,7 +193,7 @@ local function equipGear()
 	end
 end
 
--- Rotação Automática Apenas ao Parar (Olha para o alvo se estiver parado, livre se estiver andando)
+-- Rotação Automática com Atraso (Espera meio segundo após parar para virar suavemente)
 aimLockConnection = RunService.RenderStepped:Connect(function(dt)
 	if isTornadoEnabled and selectedTarget and selectedTarget.Character then
 		local targetChar = selectedTarget.Character
@@ -202,20 +203,29 @@ aimLockConnection = RunService.RenderStepped:Connect(function(dt)
 		local humanoid = myChar and myChar:FindFirstChildOfClass("Humanoid")
 		
 		if targetRoot and myRoot and humanoid then
-			-- Verifica se o jogador NÃO está se movendo (MoveDirection Magnitude próximo de 0)
 			local isMoving = humanoid.MoveDirection.Magnitude > 0.1
 			
-			if not isMoving then
-				-- Se estiver parado, vira suavemente de frente para o alvo
-				local currentPos = myRoot.Position
-				local lookAtPos = Vector3.new(targetRoot.Position.X, currentPos.Y, targetRoot.Position.Z)
-				if (lookAtPos - currentPos).Magnitude > 1 then
-					local targetCFrame = CFrame.lookAt(currentPos, lookAtPos)
-					myRoot.CFrame = myRoot.CFrame:Lerp(targetCFrame, math.clamp(dt * 10, 0, 1))
+			if isMoving then
+				-- Se estiver andando, reseta o tempo de parada imediatamente
+				stoppedTime = 0
+			else
+				-- Se estiver parado, acumula o tempo que passou
+				stoppedTime = stoppedTime + dt
+				
+				-- Só começa a virar se estiver parado há mais de 0.5 segundos
+				if stoppedTime >= 0.5 then
+					local currentPos = myRoot.Position
+					local lookAtPos = Vector3.new(targetRoot.Position.X, currentPos.Y, targetRoot.Position.Z)
+					if (lookAtPos - currentPos).Magnitude > 1 then
+						local targetCFrame = CFrame.lookAt(currentPos, lookAtPos)
+						-- Reduzido para '6' para dar uma suavizada bem agradável na virada
+						myRoot.CFrame = myRoot.CFrame:Lerp(targetCFrame, math.clamp(dt * 6, 0, 1))
+					end
 				end
 			end
-			-- Se estiver andando (`isMoving` = true), o script não mexe em nada, dando total liberdade de movimento.
 		end
+	else
+		stoppedTime = 0
 	end
 end)
 
@@ -288,5 +298,6 @@ ToggleBtn.MouseButton1Click:Connect(function()
 	else
 		ToggleBtn.Text = "Tornado: OFF"
 		ToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+		stoppedTime = 0
 	end
 end)
