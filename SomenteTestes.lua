@@ -225,32 +225,43 @@ aimLockConnection = RunService.RenderStepped:Connect(function(dt)
 	end
 end)
 
--- Main Tornado Loop Routine (Resiliente a Respawn)
+-- Main Tornado Loop Routine (Resiliente a Respawn com Correção de Checagem)
 local function startTornadoRoutine()
 	task.spawn(function()
-		-- Monitor contínuo acoplado ao ciclo de vida do jogador
 		while isTornadoEnabled do
 			local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 			local humanoid = char:WaitForChild("Humanoid", 5)
 			
 			if humanoid then
-				task.wait(1.5) -- Aguarda estabilizar o carregamento do personagem após o reset
+				task.wait(1.5) -- Aguarda estabilizar o personagem após o reset
 				if not isTornadoEnabled then break end
 				
 				equipGear()
 				task.wait(1)
 				
 				while isTornadoEnabled and humanoid.Health > 0 and LocalPlayer.Character == char do
-					-- Verificação a cada 2 segundos se a ferramenta está equipada ou no inventário
+					-- Checa se o gear está na mão ou na mochila independentemente do nome exato
 					local currentTool = char:FindFirstChildOfClass("Tool")
 					local backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
 					
-					local hasGear = currentTool or (backpack and backpack:FindFirstChild("Gear"))
+					local hasGear = false
+					if currentTool then
+						hasGear = true
+					elseif backpack then
+						for _, item in ipairs(backpack:GetChildren()) do
+							if item:IsA("Tool") then
+								hasGear = true
+								break
+							end
+						end
+					end
+					
+					-- Se não encontrar nenhuma ferramenta equipada ou na mochila, força o equipamento
 					if not hasGear then
 						equipGear()
 					end
 					
-					task.wait(2)
+					task.wait(2) -- Intervalo de checagem a cada 2 segundos
 					
 					if not isTornadoEnabled or humanoid.Health <= 0 or LocalPlayer.Character ~= char then break end
 					
