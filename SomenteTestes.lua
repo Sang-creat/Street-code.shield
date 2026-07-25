@@ -3,7 +3,6 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
-local VirtualInputManager = game:GetService("VirtualInputManager")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -14,7 +13,7 @@ local isTornadoEnabled = false
 local selectedTarget = nil
 local aimLockConnection = nil
 
--- Remotes (Baseado no SimpleSpy)
+-- Remotes
 local avatarMainRE = ReplicatedStorage:FindFirstChild("AvatarMainRE", true)
 
 -- GUI Creation
@@ -193,8 +192,8 @@ local function equipGear()
 	end
 end
 
--- Smooth Aim-Lock System (Correção do travamento de movimento)
-aimLockConnection = RunService.RenderStepped:Connect(function(dt)
+-- Aim-Lock Leve (Usa apenas a propriedade CFrame do HumanoidRootPart sem travar o input de caminhada bruscamente)
+aimLockConnection = RunService.RenderStepped:Connect(function()
 	if isTornadoEnabled and selectedTarget and selectedTarget.Character then
 		local targetChar = selectedTarget.Character
 		local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
@@ -202,18 +201,17 @@ aimLockConnection = RunService.RenderStepped:Connect(function(dt)
 		local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
 		
 		if targetRoot and myRoot then
-			-- Calcula a direção apenas no plano horizontal (Y fixo para não inclinar o personagem)
-			local direction = Vector3.new(targetRoot.Position.X, myRoot.Position.Y, targetRoot.Position.Z) - myRoot.Position
-			if direction.Magnitude > 0.1 then
-				local targetCFrame = CFrame.new(myRoot.Position, myRoot.Position + direction)
-				-- Usa Slerp para girar suavemente sem quebrar a física de caminhada ou travar o boneco
-				myRoot.CFrame = myRoot.CFrame:Lerp(targetCFrame, math.clamp(dt * 15, 0, 1))
+			-- Faz apenas o personagem olhar para o alvo no plano horizontal sem corromper a velocidade de andar
+			local currentPos = myRoot.Position
+			local lookAtPos = Vector3.new(targetRoot.Position.X, currentPos.Y, targetRoot.Position.Z)
+			if (lookAtPos - currentPos).Magnitude > 1 then
+				myRoot.CFrame = CFrame.lookAt(currentPos, lookAtPos)
 			end
 		end
 	end
 end)
 
--- Main Tornado Loop Routine with Circular Spawning & Scale Adjustment
+-- Main Tornado Loop Routine (Sem cliques fantasmas na tela do Delta)
 local function startTornadoRoutine()
 	task.spawn(function()
 		while isTornadoEnabled do
@@ -221,18 +219,19 @@ local function startTornadoRoutine()
 			local humanoid = char:WaitForChild("Humanoid", 5)
 			
 			if humanoid then
-				task.wait(2) -- Wait 2 seconds after spawn/start
+				task.wait(2)
 				if not isTornadoEnabled then break end
 				equipGear()
-				task.wait(1) -- Wait for gear to load into slot properly
+				task.wait(1)
 				
 				while isTornadoEnabled and humanoid.Health > 0 do
-					-- Simulate touch/click to trigger tornado
-					VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-					task.wait(0.05)
-					VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+					-- Ativa a ferramenta diretamente pelo script de forma segura (sem simular toque na tela do executor)
+					local currentTool = char:FindFirstChildOfClass("Tool")
+					if currentTool then
+						currentTool:Activate()
+					end
 					
-					-- Circular Spawning & Scale Modification for Workspace Tornadoes
+					-- Ajuste de escala e posicionamento dos tornados criados
 					task.spawn(function()
 						local radius = 10 
 						local angle = tick() * 5 
@@ -250,11 +249,6 @@ local function startTornadoRoutine()
 									local targetPos = myRoot.Position + Vector3.new(offsetX, 0, offsetZ)
 									
 									obj.CFrame = CFrame.new(targetPos)
-									
-									local bodyVel = obj:FindFirstChildOfClass("BodyVelocity")
-									if bodyVel then
-										bodyVel.Velocity = Vector3.new(offsetX, 0, offsetZ).Unit * 25
-									end
 								end
 
 								local mesh = obj:FindFirstChild("Mesh") or obj:FindFirstChildWhichIsA("SpecialMesh")
@@ -266,7 +260,7 @@ local function startTornadoRoutine()
 						end
 					end)
 					
-					task.wait(1.5) -- Wait 1.5 seconds between each shot
+					task.wait(1.5)
 				end
 			end
 			
