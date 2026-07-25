@@ -1,179 +1,265 @@
+-- Services
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local CoreGui = game:GetService("CoreGui")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 
-if CoreGui:FindFirstChild("TornadoGUI") then
-    CoreGui.TornadoGUI:Destroy()
-end
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "TornadoGUI"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = CoreGui
-
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 240, 0, 320)
-mainFrame.Position = UDim2.new(0.05, 0, 0.25, 0)
-mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-mainFrame.BorderSizePixel = 0
-mainFrame.Active = true
-mainFrame.Draggable = true
-mainFrame.Parent = screenGui
-
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 40)
-title.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.Text = "Auto Tornado - Delta"
-title.Font = Enum.Font.SourceSansBold
-title.TextSize = 16
-title.Parent = mainFrame
-
-local toggleBtn = Instance.new("TextButton")
-toggleBtn.Size = UDim2.new(0.9, 0, 0, 40)
-toggleBtn.Position = UDim2.new(0.05, 0, 0.15, 0)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-toggleBtn.Text = "Status: OFF"
-toggleBtn.Font = Enum.Font.SourceSansBold
-toggleBtn.TextSize = 15
-toggleBtn.Parent = mainFrame
-
-local targetLabel = Instance.new("TextLabel")
-targetLabel.Size = UDim2.new(0.9, 0, 0, 25)
-targetLabel.Position = UDim2.new(0.05, 0, 0.30, 0)
-targetLabel.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-targetLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-targetLabel.Text = "Alvo: Nenhum"
-targetLabel.Font = Enum.Font.SourceSans
-targetLabel.TextSize = 13
-targetLabel.Parent = mainFrame
-
-local scrollingFrame = Instance.new("ScrollingFrame")
-scrollingFrame.Size = UDim2.new(0.9, 0, 0.53, 0)
-scrollingFrame.Position = UDim2.new(0.05, 0, 0.41, 0)
-scrollingFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-scrollingFrame.BorderSizePixel = 0
-scrollingFrame.ScrollBarThickness = 6
-scrollingFrame.Parent = mainFrame
-
-local uiListLayout = Instance.new("UIListLayout")
-uiListLayout.Parent = scrollingFrame
-uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-uiListLayout.Padding = UDim.new(0, 5)
-
-uiListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, uiListLayout.AbsoluteContentSize.Y + 10)
-end)
-
-local running = false
+-- Configuration & State
+local GEAR_ID = 102705454
+local isTornadoEnabled = false
 local selectedTarget = nil
-local gearId = 102705454
-local avatarMainRE = ReplicatedStorage:WaitForChild("AvatarMainRE", 5)
+local aimLockConnection = nil
 
-toggleBtn.MouseButton1Click:Connect(function()
-    running = not running
-    if running then
-        toggleBtn.Text = "Status: ON"
-        toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-    else
-        toggleBtn.Text = "Status: OFF"
-        toggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-    end
-end)
+-- Remotes (Baseado no SimpleSpy)
+local avatarMainRE = ReplicatedStorage:FindFirstChild("AvatarMainRE", true)
 
+-- GUI Creation
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "TornadoControllerGui"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = PlayerGui
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 320, 0, 380)
+MainFrame.Position = UDim2.new(0.5, -160, 0.5, -190)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
+
+-- Top Bar
+local TopBar = Instance.new("Frame")
+TopBar.Size = UDim2.new(1, 0, 0, 40)
+TopBar.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+TopBar.BorderSizePixel = 0
+TopBar.Parent = MainFrame
+
+local TopBarCorner = Instance.new("UICorner")
+TopBarCorner.CornerRadius = UDim.new(0, 8)
+TopBarCorner.Parent = TopBar
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size = UDim2.new(1, -90, 1, 0)
+TitleLabel.Position = UDim2.new(0, 10, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = "Tornado Control - Mobile"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.TextSize = 14
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Parent = TopBar
+
+-- Close Button (X)
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 35, 0, 30)
+CloseBtn.Position = UDim2.new(1, -40, 0, 5)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.TextSize = 14
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.Parent = TopBar
+
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(0, 6)
+CloseCorner.Parent = CloseBtn
+
+-- Minimize Button (-)
+local MinBtn = Instance.new("TextButton")
+MinBtn.Size = UDim2.new(0, 35, 0, 30)
+MinBtn.Position = UDim2.new(1, -80, 0, 5)
+MinBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+MinBtn.Text = "-"
+MinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinBtn.TextSize = 16
+MinBtn.Font = Enum.Font.GothamBold
+MinBtn.Parent = TopBar
+
+local MinCorner = Instance.new("UICorner")
+MinCorner.CornerRadius = UDim.new(0, 6)
+MinCorner.Parent = MinBtn
+
+-- Toggle Tornado Button
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(1, -20, 0, 40)
+ToggleBtn.Position = UDim2.new(0, 10, 0, 50)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+ToggleBtn.Text = "Tornado: OFF"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.TextSize = 14
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.Parent = MainFrame
+
+local ToggleCorner = Instance.new("UICorner")
+ToggleCorner.CornerRadius = UDim.new(0, 6)
+ToggleCorner.Parent = ToggleBtn
+
+-- Player List Frame
+local ScrollingFrame = Instance.new("ScrollingFrame")
+ScrollingFrame.Size = UDim2.new(1, -20, 1, -105)
+ScrollingFrame.Position = UDim2.new(0, 10, 0, 100)
+ScrollingFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+ScrollingFrame.BorderSizePixel = 0
+ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+ScrollingFrame.Parent = MainFrame
+
+local ScrollCorner = Instance.new("UICorner")
+ScrollCorner.CornerRadius = UDim.new(0, 6)
+ScrollCorner.Parent = ScrollingFrame
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 5)
+UIListLayout.Parent = ScrollingFrame
+
+-- Function to update Player List
 local function updatePlayerList()
-    for _, child in ipairs(scrollingFrame:GetChildren()) do
-        if child:IsA("TextButton") then
-            child:Destroy()
-        end
-    end
-    
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            local pBtn = Instance.new("TextButton")
-            pBtn.Size = UDim2.new(1, -6, 0, 35)
-            pBtn.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
-            pBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            pBtn.Text = player.Name
-            pBtn.Font = Enum.Font.SourceSansBold
-            pBtn.TextSize = 14
-            pBtn.Parent = scrollingFrame
-            
-            pBtn.MouseButton1Click:Connect(function()
-                selectedTarget = player
-                targetLabel.Text = "Alvo: " .. player.Name
-                targetLabel.TextColor3 = Color3.fromRGB(50, 200, 255)
-            end)
-        end
-    end
+	for _, child in ipairs(ScrollingFrame:GetChildren()) do
+		if child:IsA("TextButton") then
+			child:Destroy()
+		end
+	end
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer then
+			local pBtn = Instance.new("TextButton")
+			pBtn.Size = UDim2.new(1, 0, 0, 35)
+			pBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+			pBtn.Text = player.Name
+			pBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+			pBtn.TextSize = 13
+			pBtn.Font = Enum.Font.Gotham
+			pBtn.Parent = ScrollingFrame
+
+			local pCorner = Instance.new("UICorner")
+			pCorner.CornerRadius = UDim.new(0, 4)
+			pCorner.Parent = pBtn
+
+			pBtn.MouseButton1Click:Connect(function()
+				selectedTarget = player
+				for _, b in ipairs(ScrollingFrame:GetChildren()) do
+					if b:IsA("TextButton") then
+						b.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+					end
+				end
+				pBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+			end)
+		end
+	end
+	ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y)
 end
 
 Players.PlayerAdded:Connect(updatePlayerList)
 Players.PlayerRemoving:Connect(updatePlayerList)
 updatePlayerList()
 
--- Loop de execução otimizado com varredura universal de ferramenta
-task.spawn(function()
-    while true do
-        if running and selectedTarget and avatarMainRE then
-            local character = LocalPlayer.Character
-            local backpack = LocalPlayer.Backpack
-            local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-            
-            -- Procura o gear tanto no personagem quanto na mochila de forma flexível
-            local currentTool = (character and character:FindFirstChild("Gear" .. gearId)) or 
-                                (backpack and backpack:FindFirstChild("Gear" .. gearId)) or
-                                (character and character:FindFirstChildOfClass("Tool")) or
-                                (backpack and backpack:FindFirstChildOfClass("Tool"))
+-- Minimize / Restore Logic
+local minimized = false
+MinBtn.MouseButton1Click:Connect(function()
+	minimized = not minimized
+	ScrollingFrame.Visible = not minimized
+	ToggleBtn.Visible = not minimized
+	MainFrame.Size = minimized and UDim2.new(0, 320, 0, 40) or UDim2.new(0, 320, 0, 380)
+	MinBtn.Text = minimized and "+" or "-"
+end)
 
-            if not currentTool or not humanoid or humanoid.Health <= 0 then
-                pcall(function()
-                    avatarMainRE:FireServer({
-                        ["id"] = gearId,
-                        ["event"] = "equip",
-                        ["equiptype"] = "Gear"
-                    })
-                end)
-                task.wait(1.5)
-                character = LocalPlayer.Character
-                backpack = LocalPlayer.Backpack
-            end
-            
-            -- Reatribui a ferramenta atualizada
-            character = LocalPlayer.Character
-            backpack = LocalPlayer.Backpack
-            local activeTool = (character and character:FindFirstChild("Gear" .. gearId)) or 
-                               (backpack and backpack:FindFirstChild("Gear" .. gearId)) or
-                               (character and character:FindFirstChildOfClass("Tool"))
-            
-            if activeTool then
-                if activeTool.Parent == backpack then
-                    activeTool.Parent = character
-                end
-                
-                -- Executa o Aim-Lock e os disparos em cadeia respeitando o intervalo de 2 segundos
-                while running and selectedTarget and selectedTarget.Character and selectedTarget.Character:FindFirstChild("HumanoidRootPart") do
-                    local myRoot = character and character:FindFirstChild("HumanoidRootPart")
-                    local targetRoot = selectedTarget.Character.HumanoidRootPart
-                    
-                    if myRoot and targetRoot then
-                        myRoot.CFrame = CFrame.new(myRoot.Position, Vector3.new(targetRoot.Position.X, myRoot.Position.Y, targetRoot.Position.Z))
-                    end
-                    
-                    if activeTool and activeTool.Parent == character then
-                        pcall(function()
-                            activeTool:Activate()
-                        end)
-                    else
-                        break
-                    end
-                    
-                    task.wait(2)
-                end
-            end
-        end
-        task.wait(2)
-    end
+-- Close Permanently Logic
+CloseBtn.MouseButton1Click:Connect(function()
+	isTornadoEnabled = false
+	if aimLockConnection then aimLockConnection:Disconnect() end
+	ScreenGui:Destroy()
+end)
+
+-- Equip Gear Function
+local function equipGear()
+	if avatarMainRE then
+		pcall(function()
+			avatarMainRE:FireServer({
+				["id"] = GEAR_ID,
+				["event"] = "equip",
+				["equiptype"] = "Gear"
+			})
+		end)
+	end
+end
+
+-- Aim-Lock System
+aimLockConnection = RunService.RenderStepped:Connect(function()
+	if isTornadoEnabled and selectedTarget and selectedTarget.Character then
+		local targetChar = selectedTarget.Character
+		local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+		local myChar = LocalPlayer.Character
+		local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+		
+		if targetRoot and myRoot then
+			myRoot.CFrame = CFrame.new(myRoot.Position, Vector3.new(targetRoot.Position.X, myRoot.Position.Y, targetRoot.Position.Z))
+		end
+	end
+end)
+
+-- Main Tornado Loop Routine with Respawn & Custom Scale Adjustment
+local function startTornadoRoutine()
+	task.spawn(function()
+		while isTornadoEnabled do
+			local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+			local humanoid = char:WaitForChild("Humanoid", 5)
+			
+			if humanoid then
+				task.wait(2) -- Wait 2 seconds after spawn/start
+				if not isTornadoEnabled then break end
+				equipGear()
+				task.wait(1) -- Wait for gear to load into slot properly
+				
+				while isTornadoEnabled and humanoid.Health > 0 do
+					-- Simulate touch/click to trigger tornado
+					VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+					task.wait(0.05)
+					VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+					
+					-- Automatically scale spawned tornadoes in Workspace based on properties analyzed
+					task.spawn(function()
+						for _, obj in ipairs(Workspace:GetChildren()) do
+							if obj.Name == "TornadoMesh" or obj:FindFirstChild("TornadoMesh") then
+								local mesh = obj:FindFirstChild("Mesh") or obj:FindFirstChildWhichIsA("SpecialMesh")
+								if mesh and not mesh:GetAttribute("ScaledCustom") then
+									mesh:SetAttribute("ScaledCustom", true)
+									mesh.Scale = Vector3.new(7, 9, 7) -- Ajuste personalizado opcional do tamanho
+								end
+							end
+						end
+					end)
+					
+					task.wait(1.5) -- Wait 1.5 seconds between each shot
+				end
+			end
+			
+			if isTornadoEnabled and humanoid then
+				humanoid.Died:Wait()
+			end
+			task.wait(1)
+		end
+	end)
+end
+
+-- Toggle Button Logic
+ToggleBtn.MouseButton1Click:Connect(function()
+	isTornadoEnabled = not isTornadoEnabled
+	if isTornadoEnabled then
+		ToggleBtn.Text = "Tornado: ON"
+		ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+		startTornadoRoutine()
+	else
+		ToggleBtn.Text = "Tornado: OFF"
+		ToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+	end
 end)
