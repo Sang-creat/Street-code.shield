@@ -180,16 +180,14 @@ CloseBtn.MouseButton1Click:Connect(function()
 	ScreenGui:Destroy()
 end)
 
--- Equip Gear Function
+-- Equip Gear Function Corrigido (Estrutura exata capturada no SimpleSpy)
 local function equipGear()
 	if avatarMainRE then
 		pcall(function()
 			avatarMainRE:FireServer({
-				[1] = {
-					["id"] = GEAR_ID,
-					["event"] = "equip",
-					["equiptype"] = "Gear"
-				}
+				["id"] = GEAR_ID,
+				["event"] = "equip",
+				["equiptype"] = "Gear"
 			})
 		end)
 	end
@@ -226,7 +224,7 @@ aimLockConnection = RunService.RenderStepped:Connect(function(dt)
 	end
 end)
 
--- Main Paintball Routine (Auto-equipamento inicial e resiliência pós-morte/reset)
+-- Main Paintball Routine
 local function startPaintballRoutine()
 	task.spawn(function()
 		while isPaintballEnabled do
@@ -234,21 +232,32 @@ local function startPaintballRoutine()
 			local humanoid = char:WaitForChild("Humanoid", 5)
 			
 			if humanoid then
-				task.wait(1.5) -- Estabilização inicial pós-spawn
+				task.wait(1.5)
 				if not isPaintballEnabled then break end
 				
-				equipGear() -- Equipamento inicial obrigatório
+				equipGear()
 				task.wait(1)
 				
 				while isPaintballEnabled and humanoid.Health > 0 and LocalPlayer.Character == char do
-					task.wait(0.1) -- Loop de disparo rápido sem cooldown
+					task.wait(0.1)
 					
 					if not isPaintballEnabled or humanoid.Health <= 0 or LocalPlayer.Character ~= char then break end
 					
-					-- Disparo automático via WeaponEvent na posição atual do alvo selecionado
+					-- Busca flexível da ferramenta de paintball na mão do personagem
 					if selectedTarget and selectedTarget.Character then
 						local targetRoot = selectedTarget.Character:FindFirstChild("HumanoidRootPart")
-						local gearTool = char:FindFirstChild("Gear" .. tostring(GEAR_ID)) or char:FindFirstChildOfClass("Tool")
+						local gearTool = nil
+						
+						for _, item in ipairs(char:GetChildren()) do
+							if item:IsA("Tool") and (item.Name:match(tostring(GEAR_ID)) or item:FindFirstChild("WeaponEvent")) then
+								gearTool = item
+								break
+							end
+						end
+						
+						if not gearTool then
+							gearTool = char:FindFirstChildOfClass("Tool")
+						end
 						
 						if targetRoot and gearTool then
 							local weaponEvent = gearTool:FindFirstChild("WeaponEvent")
@@ -262,13 +271,12 @@ local function startPaintballRoutine()
 				end
 			end
 			
-			-- Caso morra ou reinicie, aguarda 2 segundos após o novo spawn para reequipar
 			if isPaintballEnabled and humanoid then
 				pcall(function()
 					humanoid.Died:Wait()
 				end)
 			end
-			task.wait(2) -- Intervalo exato solicitado para reequipamento pós-morte/reset
+			task.wait(2)
 			if isPaintballEnabled then
 				equipGear()
 			end
