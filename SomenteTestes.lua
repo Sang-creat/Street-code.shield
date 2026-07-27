@@ -8,8 +8,8 @@ local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 -- Configuration & State
-local GEAR_ID = 102705454
-local isTornadoEnabled = false
+local GEAR_ID = 26017478
+local isPaintballEnabled = false
 local selectedTarget = nil
 local aimLockConnection = nil
 local stoppedTime = 0
@@ -19,7 +19,7 @@ local avatarMainRE = ReplicatedStorage:FindFirstChild("AvatarMainRE", true)
 
 -- GUI Creation
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "TornadoControllerGui"
+ScreenGui.Name = "PaintballControllerGui"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = PlayerGui
 
@@ -52,7 +52,7 @@ local TitleLabel = Instance.new("TextLabel")
 TitleLabel.Size = UDim2.new(1, -90, 1, 0)
 TitleLabel.Position = UDim2.new(0, 10, 0, 0)
 TitleLabel.BackgroundTransparency = 1
-TitleLabel.Text = "Tornado Control - Mobile"
+TitleLabel.Text = "Paintball Control - Mobile"
 TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 TitleLabel.TextSize = 14
 TitleLabel.Font = Enum.Font.GothamBold
@@ -89,12 +89,12 @@ local MinCorner = Instance.new("UICorner")
 MinCorner.CornerRadius = UDim.new(0, 6)
 MinCorner.Parent = MinBtn
 
--- Toggle Tornado Button
+-- Toggle Paintball Button
 local ToggleBtn = Instance.new("TextButton")
 ToggleBtn.Size = UDim2.new(1, -20, 0, 40)
 ToggleBtn.Position = UDim2.new(0, 10, 0, 50)
 ToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-ToggleBtn.Text = "Tornado: OFF"
+ToggleBtn.Text = "Paintball: OFF"
 ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 ToggleBtn.TextSize = 14
 ToggleBtn.Font = Enum.Font.GothamBold
@@ -175,7 +175,7 @@ end)
 
 -- Close Permanently Logic
 CloseBtn.MouseButton1Click:Connect(function()
-	isTornadoEnabled = false
+	isPaintballEnabled = false
 	if aimLockConnection then aimLockConnection:Disconnect() end
 	ScreenGui:Destroy()
 end)
@@ -185,17 +185,19 @@ local function equipGear()
 	if avatarMainRE then
 		pcall(function()
 			avatarMainRE:FireServer({
-				["id"] = GEAR_ID,
-				["event"] = "equip",
-				["equiptype"] = "Gear"
+				[1] = {
+					["id"] = GEAR_ID,
+					["event"] = "equip",
+					["equiptype"] = "Gear"
+				}
 			})
 		end)
 	end
 end
 
--- Rotação Automática com Atraso Suavizada
+-- Rotação Suave baseada em parada (Atraso de 0.5s)
 aimLockConnection = RunService.RenderStepped:Connect(function(dt)
-	if isTornadoEnabled and selectedTarget and selectedTarget.Character then
+	if isPaintballEnabled and selectedTarget and selectedTarget.Character then
 		local targetChar = selectedTarget.Character
 		local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
 		local myChar = LocalPlayer.Character
@@ -209,7 +211,6 @@ aimLockConnection = RunService.RenderStepped:Connect(function(dt)
 				stoppedTime = 0
 			else
 				stoppedTime = stoppedTime + dt
-				
 				if stoppedTime >= 0.5 then
 					local currentPos = myRoot.Position
 					local lookAtPos = Vector3.new(targetRoot.Position.X, currentPos.Y, targetRoot.Position.Z)
@@ -225,103 +226,65 @@ aimLockConnection = RunService.RenderStepped:Connect(function(dt)
 	end
 end)
 
--- Main Tornado Loop Routine (Resiliente a Respawn com Correção de Checagem)
-local function startTornadoRoutine()
+-- Main Paintball Routine (Auto-equipamento inicial e resiliência pós-morte/reset)
+local function startPaintballRoutine()
 	task.spawn(function()
-		while isTornadoEnabled do
+		while isPaintballEnabled do
 			local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 			local humanoid = char:WaitForChild("Humanoid", 5)
 			
 			if humanoid then
-				task.wait(1.5) -- Aguarda estabilizar o personagem após o reset
-				if not isTornadoEnabled then break end
+				task.wait(1.5) -- Estabilização inicial pós-spawn
+				if not isPaintballEnabled then break end
 				
-				equipGear()
+				equipGear() -- Equipamento inicial obrigatório
 				task.wait(1)
 				
-				while isTornadoEnabled and humanoid.Health > 0 and LocalPlayer.Character == char do
-					-- Checa se o gear está na mão ou na mochila independentemente do nome exato
-					local currentTool = char:FindFirstChildOfClass("Tool")
-					local backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
+				while isPaintballEnabled and humanoid.Health > 0 and LocalPlayer.Character == char do
+					task.wait(0.1) -- Loop de disparo rápido sem cooldown
 					
-					local hasGear = false
-					if currentTool then
-						hasGear = true
-					elseif backpack then
-						for _, item in ipairs(backpack:GetChildren()) do
-							if item:IsA("Tool") then
-								hasGear = true
-								break
+					if not isPaintballEnabled or humanoid.Health <= 0 or LocalPlayer.Character ~= char then break end
+					
+					-- Disparo automático via WeaponEvent na posição atual do alvo selecionado
+					if selectedTarget and selectedTarget.Character then
+						local targetRoot = selectedTarget.Character:FindFirstChild("HumanoidRootPart")
+						local gearTool = char:FindFirstChild("Gear" .. tostring(GEAR_ID)) or char:FindFirstChildOfClass("Tool")
+						
+						if targetRoot and gearTool then
+							local weaponEvent = gearTool:FindFirstChild("WeaponEvent")
+							if weaponEvent then
+								pcall(function()
+									weaponEvent:FireServer(targetRoot.Position)
+								end)
 							end
 						end
 					end
-					
-					-- Se não encontrar nenhuma ferramenta equipada ou na mochila, força o equipamento
-					if not hasGear then
-						equipGear()
-					end
-					
-					task.wait(2) -- Intervalo de checagem a cada 2 segundos
-					
-					if not isTornadoEnabled or humanoid.Health <= 0 or LocalPlayer.Character ~= char then break end
-					
-					-- Ativa a ferramenta se estiver na mão
-					currentTool = char:FindFirstChildOfClass("Tool")
-					if currentTool then
-						currentTool:Activate()
-					end
-					
-					-- Manipulação dos tornados criados no workspace
-					task.spawn(function()
-						local radius = 10 
-						local angle = tick() * 5 
-
-						for _, obj in ipairs(Workspace:GetChildren()) do
-							if (obj.Name == "TornadoMesh" or obj:FindFirstChild("TornadoMesh")) and not obj:GetAttribute("CircularSet") then
-								obj:SetAttribute("CircularSet", true)
-								
-								local myChar = LocalPlayer.Character
-								local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-								
-								if myRoot and obj:IsA("BasePart") then
-									local offsetX = math.cos(angle) * radius
-									local offsetZ = math.sin(angle) * radius
-									local targetPos = myRoot.Position + Vector3.new(offsetX, 0, offsetZ)
-									
-									obj.CFrame = CFrame.new(targetPos)
-								end
-
-								local mesh = obj:FindFirstChild("Mesh") or obj:FindFirstChildWhichIsA("SpecialMesh")
-								if mesh and not mesh:GetAttribute("ScaledCustom") then
-									mesh:SetAttribute("ScaledCustom", true)
-									mesh.Scale = Vector3.new(7, 9, 7)
-								end
-							end
-						end
-					end)
 				end
 			end
 			
-			-- Aguarda o personagem morrer ou resetar para reiniciar o ciclo limpo
-			if isTornadoEnabled and humanoid then
+			-- Caso morra ou reinicie, aguarda 2 segundos após o novo spawn para reequipar
+			if isPaintballEnabled and humanoid then
 				pcall(function()
 					humanoid.Died:Wait()
 				end)
 			end
-			task.wait(1)
+			task.wait(2) -- Intervalo exato solicitado para reequipamento pós-morte/reset
+			if isPaintballEnabled then
+				equipGear()
+			end
 		end
 	end)
 end
 
 -- Toggle Button Logic
 ToggleBtn.MouseButton1Click:Connect(function()
-	isTornadoEnabled = not isTornadoEnabled
-	if isTornadoEnabled then
-		ToggleBtn.Text = "Tornado: ON"
+	isPaintballEnabled = not isPaintballEnabled
+	if isPaintballEnabled then
+		ToggleBtn.Text = "Paintball: ON"
 		ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-		startTornadoRoutine()
+		startPaintballRoutine()
 	else
-		ToggleBtn.Text = "Tornado: OFF"
+		ToggleBtn.Text = "Paintball: OFF"
 		ToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 		stoppedTime = 0
 	end
