@@ -1,6 +1,6 @@
 --[[\
-    Infinite Yield - Reach, BoxReach & HandlerSkill GUI Adaptada
-    Otimizado para Delta Mobile (Estrutura em Abas e Isolada)
+    Infinite Yield - Reach, BoxReach & HandlerSkill GUI Adaptada (Corrigida)
+    Otimizado para Delta Mobile
 ]]--
 
 local Players = game:GetService("Players")
@@ -13,11 +13,12 @@ if CoreGui:FindFirstChild("IYCustomReachGUI") then
     CoreGui.IYCustomReachGUI:Destroy()
 end
 
--- Estados globais das funções (Baseados no Infinite Yield original)
+-- Configurações globais e estado do Alvo Selecionado para o HandlerSkill
 local ReachConfig = {
     Reach = {Enabled = false, Size = 5},
     BoxReach = {Enabled = false, Size = 5},
-    Handler = {Enabled = false, Size = 5}
+    Handler = {Enabled = false, Size = 5},
+    SelectedTarget = nil -- Necessário para a lógica do HandlerSkill
 }
 
 -- Criação da ScreenGui principal
@@ -31,8 +32,8 @@ local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-MainFrame.Position = UDim2.new(0.5, -210, 0.5, -190)
-MainFrame.Size = UDim2.new(0, 420, 0, 380)
+MainFrame.Position = UDim2.new(0.5, -210, 0.5, -200)
+MainFrame.Size = UDim2.new(0, 420, 0, 400)
 MainFrame.Active = true
 MainFrame.Draggable = true
 
@@ -40,7 +41,7 @@ local MainCorner = Instance.new("UICorner")
 MainCorner.CornerRadius = UDim.new(0, 8)
 MainCorner.Parent = MainFrame
 
--- Topbar / Título
+-- Título
 local TitleLabel = Instance.new("TextLabel")
 TitleLabel.Parent = MainFrame
 TitleLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
@@ -55,7 +56,7 @@ local TitleCorner = Instance.new("UICorner")
 TitleCorner.CornerRadius = UDim.new(0, 8)
 TitleCorner.Parent = TitleLabel
 
--- Barra de Abas (Navegação)
+-- Barra de Abas
 local TabBar = Instance.new("Frame")
 TabBar.Parent = MainFrame
 TabBar.BackgroundTransparency = 1
@@ -68,14 +69,14 @@ TabListLayout.FillDirection = Enum.FillDirection.Horizontal
 TabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 TabListLayout.Padding = UDim.new(0, 8)
 
--- Container dos Conteúdos das Abas
+-- Container dos Conteúdos
 local ContentContainer = Instance.new("Frame")
 ContentContainer.Parent = MainFrame
 ContentContainer.BackgroundTransparency = 1
 ContentContainer.Position = UDim2.new(0, 10, 0, 80)
 ContentContainer.Size = UDim2.new(1, -20, 1, -90)
 
--- Criador de Abas
+-- Função para criar abas
 local function createTab(name, order)
     local TabButton = Instance.new("TextButton")
     TabButton.Name = name .. "Btn"
@@ -120,15 +121,15 @@ local function createTab(name, order)
     return TabContent, TabButton
 end
 
--- Aba 1: Jogadores
-local PlayersTab, PlayersBtn = createTab("Lista de Jogadores", 1)
-PlayersBtn.BackgroundColor3 = Color3.fromRGB(70, 130, 180) -- Deixa ativa por padrão
+-- Aba 1: Jogadores (Alvo para o HandlerSkill)
+local PlayersTab, PlayersBtn = createTab("Lista de Alvos (Handler)", 1)
+PlayersBtn.BackgroundColor3 = Color3.fromRGB(70, 130, 180)
 PlayersTab.Visible = true
 
--- Aba 2: Controles Técnicos (Reach, BoxReach, HandlerSkill)
-local ControlsTab, ControlsBtn = createTab("Controles (Reach / Box / Handler)", 2)
+-- Aba 2: Controles Técnicos Separados
+local ControlsTab, ControlsBtn = createTab("Controles (3 Funções)", 2)
 
--- Função para popular a lista de jogadores na Aba 1
+-- Popula a Lista de Jogadores na Aba 1 com botão de seleção de Alvo
 local function renderPlayerList()
     for _, child in ipairs(PlayersTab:GetChildren()) do
         if child:IsA("Frame") then child:Destroy() end
@@ -139,7 +140,7 @@ local function renderPlayerList()
             local PlayerRow = Instance.new("Frame")
             PlayerRow.Parent = PlayersTab
             PlayerRow.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
-            PlayerRow.Size = UDim2.new(1, -6, 0, 40)
+            PlayerRow.Size = UDim2.new(1, -6, 0, 42)
 
             local RowCorner = Instance.new("UICorner")
             RowCorner.CornerRadius = UDim.new(0, 6)
@@ -149,22 +150,48 @@ local function renderPlayerList()
             PNameLabel.Parent = PlayerRow
             PNameLabel.BackgroundTransparency = 1
             PNameLabel.Position = UDim2.new(0, 12, 0, 0)
-            PNameLabel.Size = UDim2.new(1, -20, 1, 0)
+            PNameLabel.Size = UDim2.new(0, 200, 1, 0)
             PNameLabel.Font = Enum.Font.GothamSemibold
             PNameLabel.Text = player.Name
             PNameLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
             PNameLabel.TextSize = 13
             PNameLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+            local SelectBtn = Instance.new("TextButton")
+            SelectBtn.Parent = PlayerRow
+            SelectBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 85)
+            SelectBtn.Position = UDim2.new(1, -145, 0, 6)
+            SelectBtn.Size = UDim2.new(0, 135, 0, 30)
+            SelectBtn.Font = Enum.Font.GothamBold
+            SelectBtn.Text = "Selecionar Alvo"
+            SelectBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            SelectBtn.TextSize = 11
+
+            local SelectCorner = Instance.new("UICorner")
+            SelectCorner.CornerRadius = UDim.new(0, 4)
+            SelectCorner.Parent = SelectBtn
+
+            SelectBtn.MouseButton1Click:Connect(function()
+                ReachConfig.SelectedTarget = player
+                for _, c in ipairs(PlayersTab:GetChildren()) do
+                    if c:IsA("Frame") and c:FindFirstChild("TextButton") then
+                        c.TextButton.BackgroundColor3 = Color3.fromRGB(70, 70, 85)
+                        c.TextButton.Text = "Selecionar Alvo"
+                    end
+                end
+                SelectBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 80)
+                SelectBtn.Text = "Alvo Ativo: " .. player.Name
+            end)
         end
     end
-    PlayersTab.CanvasSize = UDim2.new(0, 0, 0, #Players:GetPlayers() * 48)
+    PlayersTab.CanvasSize = UDim2.new(0, 0, 0, #Players:GetPlayers() * 50)
 end
 
 renderPlayerList()
 Players.PlayerAdded:Connect(renderPlayerList)
 Players.PlayerRemoving:Connect(renderPlayerList)
 
--- Função para criar os painéis de controle individuais na Aba 2
+-- Função para criar os 3 painéis de controle individuais na Aba 2 sem erros
 local function createControlPanel(title, configKey, defaultSize)
     local Panel = Instance.new("Frame")
     Panel.Parent = ControlsTab
@@ -190,7 +217,7 @@ local function createControlPanel(title, configKey, defaultSize)
     TextBox.Parent = Panel
     TextBox.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
     TextBox.Position = UDim2.new(0, 12, 0, 35)
-    TextBox.Size = UDim2.new(0, 120, 0, 30)
+    TextBox.Size = UDim2.new(0, 110, 0, 30)
     TextBox.Font = Enum.Font.Gotham
     TextBox.PlaceholderText = "Tamanho"
     TextBox.Text = tostring(defaultSize)
@@ -204,8 +231,8 @@ local function createControlPanel(title, configKey, defaultSize)
     local ToggleBtn = Instance.new("TextButton")
     ToggleBtn.Parent = Panel
     ToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-    ToggleBtn.Position = UDim2.new(0, 145, 0, 35)
-    ToggleBtn.Size = UDim2.new(0, 240, 0, 30)
+    ToggleBtn.Position = UDim2.new(0, 132, 0, 35)
+    ToggleBtn.Size = UDim2.new(0, 255, 0, 30)
     ToggleBtn.Font = Enum.Font.GothamBold
     ToggleBtn.Text = "OFF (Desativado)"
     ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -232,25 +259,29 @@ local function createControlPanel(title, configKey, defaultSize)
         ReachConfig[configKey].Size = tonumber(TextBox.Text) or defaultSize
     end)
 
-    ControlsTab.CanvasSize = UDim2.new(0, 0, 0, ControlsTab.AbsoluteContentSize.Y + 20)
+    -- Atualização segura do tamanho do Canvas evitando bugs de propriedades inexistentes
+    local layout = ControlsTab:FindFirstChildOfClass("UIListLayout")
+    if layout then
+        ControlsTab.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 30)
+    end
 end
 
--- Monta os blocos individuais na Aba 2 exatamente como solicitado
-createControlPanel("Função: Reach (Infinite Yield)", "Reach", 5)
-createControlPanel("Função: BoxReach (Infinite Yield)", "BoxReach", 10)
-createControlPanel("Função: HandlerSkill (Infinite Yield)", "Handler", 5)
+-- Monta os 3 painéis individualmente na Aba 2
+createControlPanel("Função: Reach (IY)", "Reach", 5)
+createControlPanel("Função: BoxReach (IY)", "BoxReach", 10)
+createControlPanel("Função: HandlerSkill (Requer Alvo na Aba 1)", "Handler", 5)
 
--- Lógica central de execução idêntica ao IY (Atua apenas quando o jogador segura uma ferramenta)
+-- Lógica central baseada no Infinite Yield original para as 3 ferramentas ativas
 RunService.Stepped:Connect(function()
     local localChar = LocalPlayer.Character
     if not localChar then return end
     
     local tool = localChar:FindFirstChildOfClass("Tool")
-    if not tool then return end -- Só executa se estiver com ferramenta (espada) na mão
+    if not tool then return end -- Executa apenas quando estiver com a espada na mão
 
-    -- Lógica do Reach / BoxReach / Handler estruturada pelas propriedades nativas do IY
     for _, part in ipairs(tool:GetDescendants()) do
         if part:IsA("BasePart") then
+            -- Lógica Reach e BoxReach (Não precisam de alvo específico)
             if ReachConfig.Reach.Enabled then
                 part.Size = Vector3.new(ReachConfig.Reach.Size, ReachConfig.Reach.Size, ReachConfig.Reach.Size)
                 part.CanCollide = false
@@ -259,9 +290,16 @@ RunService.Stepped:Connect(function()
                 part.Size = Vector3.new(ReachConfig.BoxReach.Size, ReachConfig.BoxReach.Size, ReachConfig.BoxReach.Size)
                 part.CanCollide = false
             end
-            if ReachConfig.Handler.Enabled then
-                part.Size = Vector3.new(ReachConfig.Handler.Size, ReachConfig.Handler.Size, ReachConfig.Handler.Size)
-                part.CanCollide = false
+
+            -- Lógica HandlerSkill (Puxa a posição do alvo selecionado na Aba 1)
+            if ReachConfig.Handler.Enabled and ReachConfig.SelectedTarget then
+                local targetChar = ReachConfig.SelectedTarget.Character
+                if targetChar and targetChar:FindFirstChild("HumanoidRootPart") then
+                    local targetHrp = targetChar.HumanoidRootPart
+                    part.Size = Vector3.new(ReachConfig.Handler.Size, ReachConfig.Handler.Size, ReachConfig.Handler.Size)
+                    part.CFrame = targetHrp.CFrame
+                    part.CanCollide = false
+                end
             end
         end
     end
