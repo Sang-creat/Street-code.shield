@@ -1,151 +1,213 @@
 --[[\
-    Infinite Yield - Reach & BoxReach GUI Adapter (Otimizado para Delta)
-    Interface gráfica moderna para manipulação de Hitbox por Jogador
+    Infinite Yield - Reach, BoxReach & HandlerSkill GUI Adaptada
+    Otimizado para Delta Mobile (Estrutura em Abas e Isolada)
 ]]--
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui")
+local RunService = game:GetService("RunService")
 
--- Remove GUI anterior se já existir para evitar duplicatas
-if CoreGui:FindFirstChild("IYReachGUI") then
-    CoreGui.IYReachGUI:Destroy()
+-- Remove GUI anterior se já existir
+if CoreGui:FindFirstChild("IYCustomReachGUI") then
+    CoreGui.IYCustomReachGUI:Destroy()
 end
+
+-- Estados globais das funções (Baseados no Infinite Yield original)
+local ReachConfig = {
+    Reach = {Enabled = false, Size = 5},
+    BoxReach = {Enabled = false, Size = 5},
+    Handler = {Enabled = false, Size = 5}
+}
 
 -- Criação da ScreenGui principal
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "IYReachGUI"
+ScreenGui.Name = "IYCustomReachGUI"
 ScreenGui.Parent = CoreGui
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
--- Janela Principal (Frame)
+-- Janela Principal
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-MainFrame.Position = UDim2.new(0.5, -200, 0.5, -175)
-MainFrame.Size = UDim2.new(0, 400, 0, 350)
+MainFrame.Position = UDim2.new(0.5, -210, 0.5, -190)
+MainFrame.Size = UDim2.new(0, 420, 0, 380)
 MainFrame.Active = true
-MainFrame.Draggable = true -- Permite arrastar a janela na tela
+MainFrame.Draggable = true
 
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 8)
-UICorner.Parent = MainFrame
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 8)
+MainCorner.Parent = MainFrame
 
--- Título
+-- Topbar / Título
 local TitleLabel = Instance.new("TextLabel")
-TitleLabel.Name = "TitleLabel"
 TitleLabel.Parent = MainFrame
 TitleLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-TitleLabel.Size = UDim2.new(1, 0, 0, 40)
+TitleLabel.Size = UDim2.new(1, 0, 0, 35)
 TitleLabel.Font = Enum.Font.GothamBold
-TitleLabel.Text = "  IY Reach & BoxReach Control"
+TitleLabel.Text = "  Infinite Yield - Reach Controller Hub"
 TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-TitleLabel.TextSize = 16
+TitleLabel.TextSize = 15
 TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
 
 local TitleCorner = Instance.new("UICorner")
 TitleCorner.CornerRadius = UDim.new(0, 8)
 TitleCorner.Parent = TitleLabel
 
--- ScrollingFrame para listar os jogadores
-local ScrollingFrame = Instance.new("ScrollingFrame")
-ScrollingFrame.Name = "PlayerList"
-ScrollingFrame.Parent = MainFrame
-ScrollingFrame.Active = true
-ScrollingFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-ScrollingFrame.BorderSizePixel = 0
-ScrollingFrame.Position = UDim2.new(0, 10, 0, 50)
-ScrollingFrame.Size = UDim2.new(0, 380, 0, 290)
-ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-ScrollingFrame.ScrollBarThickness = 6
+-- Barra de Abas (Navegação)
+local TabBar = Instance.new("Frame")
+TabBar.Parent = MainFrame
+TabBar.BackgroundTransparency = 1
+TabBar.Position = UDim2.new(0, 10, 0, 42)
+TabBar.Size = UDim2.new(1, -20, 0, 32)
 
-local UIListLayout = Instance.new("UIListLayout")
-UIListLayout.Parent = ScrollingFrame
-UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-UIListLayout.Padding = UDim.new(0, 5)
+local TabListLayout = Instance.new("UIListLayout")
+TabListLayout.Parent = TabBar
+TabListLayout.FillDirection = Enum.FillDirection.Horizontal
+TabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+TabListLayout.Padding = UDim.new(0, 8)
 
--- Controle de Estados Ativos de Reach por Jogador
-local activeReaches = {}
+-- Container dos Conteúdos das Abas
+local ContentContainer = Instance.new("Frame")
+ContentContainer.Parent = MainFrame
+ContentContainer.BackgroundTransparency = 1
+ContentContainer.Position = UDim2.new(0, 10, 0, 80)
+ContentContainer.Size = UDim2.new(1, -20, 1, -90)
 
--- Lógica central baseada no funcionamento do Infinite Yield (Reach / BoxReach / Handler)
-game:GetService("RunService").Stepped:Connect(function()
+-- Criador de Abas
+local function createTab(name, order)
+    local TabButton = Instance.new("TextButton")
+    TabButton.Name = name .. "Btn"
+    TabButton.Parent = TabBar
+    TabButton.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+    TabButton.Size = UDim2.new(0, 195, 1, 0)
+    TabButton.Font = Enum.Font.GothamBold
+    TabButton.Text = name
+    TabButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+    TabButton.TextSize = 13
+    TabButton.LayoutOrder = order
+
+    local BtnCorner = Instance.new("UICorner")
+    BtnCorner.CornerRadius = UDim.new(0, 6)
+    BtnCorner.Parent = TabButton
+
+    local TabContent = Instance.new("ScrollingFrame")
+    TabContent.Name = name .. "Content"
+    TabContent.Parent = ContentContainer
+    TabContent.BackgroundTransparency = 1
+    TabContent.Size = UDim2.new(1, 0, 1, 0)
+    TabContent.CanvasSize = UDim2.new(0, 0, 0, 0)
+    TabContent.ScrollBarThickness = 5
+    TabContent.Visible = false
+
+    local ContentLayout = Instance.new("UIListLayout")
+    ContentLayout.Parent = TabContent
+    ContentLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    ContentLayout.Padding = UDim.new(0, 8)
+
+    TabButton.MouseButton1Click:Connect(function()
+        for _, child in ipairs(ContentContainer:GetChildren()) do
+            if child:IsA("ScrollingFrame") then child.Visible = false end
+        end
+        for _, child in ipairs(TabBar:GetChildren()) do
+            if child:IsA("TextButton") then child.BackgroundColor3 = Color3.fromRGB(50, 50, 60) end
+        end
+        TabContent.Visible = true
+        TabButton.BackgroundColor3 = Color3.fromRGB(70, 130, 180)
+    end)
+
+    return TabContent, TabButton
+end
+
+-- Aba 1: Jogadores
+local PlayersTab, PlayersBtn = createTab("Lista de Jogadores", 1)
+PlayersBtn.BackgroundColor3 = Color3.fromRGB(70, 130, 180) -- Deixa ativa por padrão
+PlayersTab.Visible = true
+
+-- Aba 2: Controles Técnicos (Reach, BoxReach, HandlerSkill)
+local ControlsTab, ControlsBtn = createTab("Controles (Reach / Box / Handler)", 2)
+
+-- Função para popular a lista de jogadores na Aba 1
+local function renderPlayerList()
+    for _, child in ipairs(PlayersTab:GetChildren()) do
+        if child:IsA("Frame") then child:Destroy() end
+    end
+
     for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and activeReaches[player.Name] and activeReaches[player.Name].enabled then
-            local targetChar = player.Character
-            local localChar = LocalPlayer.Character
-            if targetChar and localChar then
-                local targetHrp = targetChar:FindFirstChild("HumanoidRootPart")
-                local tool = localChar:FindFirstChildOfClass("Tool")
-                
-                if targetHrp and tool then
-                    for _, part in ipairs(tool:GetDescendants()) do
-                        if part:IsA("BasePart") then
-                            local sizeVal = activeReaches[player.Name].size or 5
-                            -- Expande temporariamente a hitbox da ferramenta na direção do alvo (lógica exata do BoxReach/Reach do IY)
-                            part.Size = Vector3.new(sizeVal, sizeVal, sizeVal)
-                            part.CFrame = targetHrp.CFrame
-                            part.CanCollide = false
-                        end
-                    end
-                end
-            end
+        if player ~= LocalPlayer then
+            local PlayerRow = Instance.new("Frame")
+            PlayerRow.Parent = PlayersTab
+            PlayerRow.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
+            PlayerRow.Size = UDim2.new(1, -6, 0, 40)
+
+            local RowCorner = Instance.new("UICorner")
+            RowCorner.CornerRadius = UDim.new(0, 6)
+            RowCorner.Parent = PlayerRow
+
+            local PNameLabel = Instance.new("TextLabel")
+            PNameLabel.Parent = PlayerRow
+            PNameLabel.BackgroundTransparency = 1
+            PNameLabel.Position = UDim2.new(0, 12, 0, 0)
+            PNameLabel.Size = UDim2.new(1, -20, 1, 0)
+            PNameLabel.Font = Enum.Font.GothamSemibold
+            PNameLabel.Text = player.Name
+            PNameLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
+            PNameLabel.TextSize = 13
+            PNameLabel.TextXAlignment = Enum.TextXAlignment.Left
         end
     end
-end)
+    PlayersTab.CanvasSize = UDim2.new(0, 0, 0, #Players:GetPlayers() * 48)
+end
 
--- Função para construir a linha de interface de cada jogador dinamicamente
-local function createPlayerRow(player)
-    if player == LocalPlayer then return end
+renderPlayerList()
+Players.PlayerAdded:Connect(renderPlayerList)
+Players.PlayerRemoving:Connect(renderPlayerList)
 
-    local Row = Instance.new("Frame")
-    Row.Name = player.Name
-    Row.Parent = ScrollingFrame
-    Row.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
-    Row.Size = UDim2.new(1, -12, 0, 45)
+-- Função para criar os painéis de controle individuais na Aba 2
+local function createControlPanel(title, configKey, defaultSize)
+    local Panel = Instance.new("Frame")
+    Panel.Parent = ControlsTab
+    Panel.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
+    Panel.Size = UDim2.new(1, -6, 0, 75)
 
-    local RowCorner = Instance.new("UICorner")
-    RowCorner.CornerRadius = UDim.new(0, 6)
-    RowCorner.Parent = Row
+    local PanelCorner = Instance.new("UICorner")
+    PanelCorner.CornerRadius = UDim.new(0, 6)
+    PanelCorner.Parent = Panel
 
-    -- Nome do Jogador
-    local NameLabel = Instance.new("TextLabel")
-    NameLabel.Parent = Row
-    NameLabel.BackgroundTransparency = 1
-    NameLabel.Position = UDim2.new(0, 10, 0, 0)
-    NameLabel.Size = UDim2.new(0, 120, 1, 0)
-    NameLabel.Font = Enum.Font.GothamSemibold
-    NameLabel.Text = player.Name
-    NameLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-    NameLabel.TextSize = 13
-    NameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    local Title = Instance.new("TextLabel")
+    Title.Parent = Panel
+    Title.BackgroundTransparency = 1
+    Title.Position = UDim2.new(0, 12, 0, 8)
+    Title.Size = UDim2.new(1, -20, 0, 20)
+    Title.Font = Enum.Font.GothamBold
+    Title.Text = title
+    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Title.TextSize = 13
+    Title.TextXAlignment = Enum.TextXAlignment.Left
 
-    -- Caixa de Texto para o Tamanho (Size / Reach Value)
-    local SizeBox = Instance.new("TextBox")
-    SizeBox.Name = "SizeBox"
-    SizeBox.Parent = Row
-    SizeBox.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
-    SizeBox.Position = UDim2.new(0, 135, 0, 8)
-    SizeBox.Size = UDim2.new(0, 50, 0, 28)
-    SizeBox.Font = Enum.Font.Gotham
-    SizeBox.PlaceholderText = "Size"
-    SizeBox.Text = "10"
-    SizeBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-    SizeBox.TextSize = 12
+    local TextBox = Instance.new("TextBox")
+    TextBox.Parent = Panel
+    TextBox.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+    TextBox.Position = UDim2.new(0, 12, 0, 35)
+    TextBox.Size = UDim2.new(0, 120, 0, 30)
+    TextBox.Font = Enum.Font.Gotham
+    TextBox.PlaceholderText = "Tamanho"
+    TextBox.Text = tostring(defaultSize)
+    TextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    TextBox.TextSize = 12
 
     local BoxCorner = Instance.new("UICorner")
     BoxCorner.CornerRadius = UDim.new(0, 4)
-    BoxCorner.Parent = SizeBox
+    BoxCorner.Parent = TextBox
 
-    -- Botão de Ligar / Desligar (Equivalente ao unreach / unboxreach)
     local ToggleBtn = Instance.new("TextButton")
-    ToggleBtn.Name = "ToggleBtn"
-    ToggleBtn.Parent = Row
+    ToggleBtn.Parent = Panel
     ToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-    ToggleBtn.Position = UDim2.new(0, 195, 0, 8)
-    ToggleBtn.Size = UDim2.new(0, 165, 0, 28)
+    ToggleBtn.Position = UDim2.new(0, 145, 0, 35)
+    ToggleBtn.Size = UDim2.new(0, 240, 0, 30)
     ToggleBtn.Font = Enum.Font.GothamBold
-    ToggleBtn.Text = "OFF (Ativar Reach)"
+    ToggleBtn.Text = "OFF (Desativado)"
     ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     ToggleBtn.TextSize = 12
 
@@ -153,45 +215,54 @@ local function createPlayerRow(player)
     BtnCorner.CornerRadius = UDim.new(0, 4)
     BtnCorner.Parent = ToggleBtn
 
-    -- Inicializa o estado do player
-    activeReaches[player.Name] = {enabled = false, size = 10}
-
-    -- Evento do Botão (Alterna entre Ligar e Desligar estilo "Un")
     ToggleBtn.MouseButton1Click:Connect(function()
-        local state = activeReaches[player.Name]
-        state.enabled = not state.enabled
-        state.size = tonumber(SizeBox.Text) or 10
+        ReachConfig[configKey].Enabled = not ReachConfig[configKey].Enabled
+        ReachConfig[configKey].Size = tonumber(TextBox.Text) or defaultSize
 
-        if state.enabled then
+        if ReachConfig[configKey].Enabled then
             ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 80)
-            ToggleBtn.Text = "ON (Desativar)"
+            ToggleBtn.Text = "ON (Ativo)"
         else
             ToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-            ToggleBtn.Text = "OFF (Ativar Reach)"
+            ToggleBtn.Text = "OFF (Desativado)"
         end
     end)
 
-    -- Atualiza dinamicamente o tamanho caso mude com o botão ligado
-    SizeBox.FocusLost:Connect(function()
-        if activeReaches[player.Name] then
-            activeReaches[player.Name].size = tonumber(SizeBox.Text) or 10
-        end
+    TextBox.FocusLost:Connect(function()
+        ReachConfig[configKey].Size = tonumber(TextBox.Text) or defaultSize
     end)
 
-    -- Atualiza o tamanho do ScrollingFrame dinamicamente
-    ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, #ScrollingFrame:GetChildren() * 50)
+    ControlsTab.CanvasSize = UDim2.new(0, 0, 0, ControlsTab.AbsoluteContentSize.Y + 20)
 end
 
--- Popula a lista inicial de jogadores
-for _, p in ipairs(Players:GetPlayers()) do
-    createPlayerRow(p)
-end
+-- Monta os blocos individuais na Aba 2 exatamente como solicitado
+createControlPanel("Função: Reach (Infinite Yield)", "Reach", 5)
+createControlPanel("Função: BoxReach (Infinite Yield)", "BoxReach", 10)
+createControlPanel("Função: HandlerSkill (Infinite Yield)", "Handler", 5)
 
--- Adiciona ou remove jogadores da lista conforme entram/saem do servidor
-Players.PlayerAdded:Connect(createPlayerRow)
-Players.PlayerRemoving:Connect(function(player)
-    activeReaches[player.Name] = nil
-    if ScrollingFrame:FindFirstChild(player.Name) then
-        ScrollingFrame[player.Name]:Destroy()
+-- Lógica central de execução idêntica ao IY (Atua apenas quando o jogador segura uma ferramenta)
+RunService.Stepped:Connect(function()
+    local localChar = LocalPlayer.Character
+    if not localChar then return end
+    
+    local tool = localChar:FindFirstChildOfClass("Tool")
+    if not tool then return end -- Só executa se estiver com ferramenta (espada) na mão
+
+    -- Lógica do Reach / BoxReach / Handler estruturada pelas propriedades nativas do IY
+    for _, part in ipairs(tool:GetDescendants()) do
+        if part:IsA("BasePart") then
+            if ReachConfig.Reach.Enabled then
+                part.Size = Vector3.new(ReachConfig.Reach.Size, ReachConfig.Reach.Size, ReachConfig.Reach.Size)
+                part.CanCollide = false
+            end
+            if ReachConfig.BoxReach.Enabled then
+                part.Size = Vector3.new(ReachConfig.BoxReach.Size, ReachConfig.BoxReach.Size, ReachConfig.BoxReach.Size)
+                part.CanCollide = false
+            end
+            if ReachConfig.Handler.Enabled then
+                part.Size = Vector3.new(ReachConfig.Handler.Size, ReachConfig.Handler.Size, ReachConfig.Handler.Size)
+                part.CanCollide = false
+            end
+        end
     end
 end)
