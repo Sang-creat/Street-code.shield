@@ -1,5 +1,5 @@
 --[[\
-    Infinite Yield - Reach, BoxReach & HandlerSkill GUI Adaptada (Corrigida)
+    Infinite Yield - Reach, BoxReach & HandlerSkill Corrigido e Funcional
     Otimizado para Delta Mobile
 ]]--
 
@@ -13,12 +13,12 @@ if CoreGui:FindFirstChild("IYCustomReachGUI") then
     CoreGui.IYCustomReachGUI:Destroy()
 end
 
--- Configurações globais e estado do Alvo Selecionado para o HandlerSkill
+-- Configurações globais ligadas aos interruptores da UI
 local ReachConfig = {
     Reach = {Enabled = false, Size = 5},
     BoxReach = {Enabled = false, Size = 5},
     Handler = {Enabled = false, Size = 5},
-    SelectedTarget = nil -- Necessário para a lógica do HandlerSkill
+    SelectedTarget = nil
 }
 
 -- Criação da ScreenGui principal
@@ -47,7 +47,7 @@ TitleLabel.Parent = MainFrame
 TitleLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
 TitleLabel.Size = UDim2.new(1, 0, 0, 35)
 TitleLabel.Font = Enum.Font.GothamBold
-TitleLabel.Text = "  Infinite Yield - Reach Controller Hub"
+TitleLabel.Text = "  Infinite Yield - Reach Controller Hub (Fix)"
 TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 TitleLabel.TextSize = 15
 TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -121,7 +121,7 @@ local function createTab(name, order)
     return TabContent, TabButton
 end
 
--- Aba 1: Jogadores (Alvo para o HandlerSkill)
+-- Aba 1: Lista de Alvos (Para HandlerSkill)
 local PlayersTab, PlayersBtn = createTab("Lista de Alvos (Handler)", 1)
 PlayersBtn.BackgroundColor3 = Color3.fromRGB(70, 130, 180)
 PlayersTab.Visible = true
@@ -129,7 +129,7 @@ PlayersTab.Visible = true
 -- Aba 2: Controles Técnicos Separados
 local ControlsTab, ControlsBtn = createTab("Controles (3 Funções)", 2)
 
--- Popula a Lista de Jogadores na Aba 1 com botão de seleção de Alvo
+-- Popula a Lista de Jogadores na Aba 1
 local function renderPlayerList()
     for _, child in ipairs(PlayersTab:GetChildren()) do
         if child:IsA("Frame") then child:Destroy() end
@@ -180,7 +180,7 @@ local function renderPlayerList()
                     end
                 end
                 SelectBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 80)
-                SelectBtn.Text = "Alvo Ativo: " .. player.Name
+                SelectBtn.Text = "Alvo: " .. player.Name
             end)
         end
     end
@@ -191,7 +191,7 @@ renderPlayerList()
 Players.PlayerAdded:Connect(renderPlayerList)
 Players.PlayerRemoving:Connect(renderPlayerList)
 
--- Função para criar os 3 painéis de controle individuais na Aba 2 sem erros
+-- Função para criar os 3 painéis de controle individuais na Aba 2
 local function createControlPanel(title, configKey, defaultSize)
     local Panel = Instance.new("Frame")
     Panel.Parent = ControlsTab
@@ -242,6 +242,7 @@ local function createControlPanel(title, configKey, defaultSize)
     BtnCorner.CornerRadius = UDim.new(0, 4)
     BtnCorner.Parent = ToggleBtn
 
+    ToggleBtn.MouseButton1Child = false
     ToggleBtn.MouseButton1Click:Connect(function()
         ReachConfig[configKey].Enabled = not ReachConfig[configKey].Enabled
         ReachConfig[configKey].Size = tonumber(TextBox.Text) or defaultSize
@@ -259,44 +260,49 @@ local function createControlPanel(title, configKey, defaultSize)
         ReachConfig[configKey].Size = tonumber(TextBox.Text) or defaultSize
     end)
 
-    -- Atualização segura do tamanho do Canvas evitando bugs de propriedades inexistentes
     local layout = ControlsTab:FindFirstChildOfClass("UIListLayout")
     if layout then
         ControlsTab.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 30)
     end
 end
 
--- Monta os 3 painéis individualmente na Aba 2
+-- Cria os painéis exatos para os 3 comandos
 createControlPanel("Função: Reach (IY)", "Reach", 5)
 createControlPanel("Função: BoxReach (IY)", "BoxReach", 10)
 createControlPanel("Função: HandlerSkill (Requer Alvo na Aba 1)", "Handler", 5)
 
--- Lógica central baseada no Infinite Yield original para as 3 ferramentas ativas
+-- Lógica central em tempo real estritamente vinculada aos botões da UI e à ferramenta ativa
 RunService.Stepped:Connect(function()
     local localChar = LocalPlayer.Character
     if not localChar then return end
     
     local tool = localChar:FindFirstChildOfClass("Tool")
-    if not tool then return end -- Executa apenas quando estiver com a espada na mão
+    if not tool then return end
 
+    -- Itera sobre todas as partes da ferramenta equipada (Handle / Lâmina)
     for _, part in ipairs(tool:GetDescendants()) do
         if part:IsA("BasePart") then
-            -- Lógica Reach e BoxReach (Não precisam de alvo específico)
+            -- 1. Comando Reach Ativo
             if ReachConfig.Reach.Enabled then
-                part.Size = Vector3.new(ReachConfig.Reach.Size, ReachConfig.Reach.Size, ReachConfig.Reach.Size)
-                part.CanCollide = false
-            end
-            if ReachConfig.BoxReach.Enabled then
-                part.Size = Vector3.new(ReachConfig.BoxReach.Size, ReachConfig.BoxReach.Size, ReachConfig.BoxReach.Size)
+                local s = ReachConfig.Reach.Size
+                part.Size = Vector3.new(s, s, s)
                 part.CanCollide = false
             end
 
-            -- Lógica HandlerSkill (Puxa a posição do alvo selecionado na Aba 1)
+            -- 2. Comando BoxReach Ativo
+            if ReachConfig.BoxReach.Enabled then
+                local s = ReachConfig.BoxReach.Size
+                part.Size = Vector3.new(s, s, s)
+                part.CanCollide = false
+            end
+
+            -- 3. Comando HandlerSkill Ativo (Exige o Alvo selecionado na Aba 1)
             if ReachConfig.Handler.Enabled and ReachConfig.SelectedTarget then
                 local targetChar = ReachConfig.SelectedTarget.Character
                 if targetChar and targetChar:FindFirstChild("HumanoidRootPart") then
                     local targetHrp = targetChar.HumanoidRootPart
-                    part.Size = Vector3.new(ReachConfig.Handler.Size, ReachConfig.Handler.Size, ReachConfig.Handler.Size)
+                    local s = ReachConfig.Handler.Size
+                    part.Size = Vector3.new(s, s, s)
                     part.CFrame = targetHrp.CFrame
                     part.CanCollide = false
                 end
