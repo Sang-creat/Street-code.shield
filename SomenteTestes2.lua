@@ -23,6 +23,23 @@ local reachConnection = nil
 local boxReachConnection = nil
 local handlerConnection = nil
 
+-- Função segura para compatibilidade com executores mobile (Delta)
+local function safeFireTouch(handle, hrp)
+    if firetouchinterest then
+        pcall(function()
+            firetouchinterest(handle, hrp, 0)
+            firetouchinterest(handle, hrp, 1)
+        end)
+    else
+        -- Método alternativo caso o executor não suporte firetouchinterest nativo
+        pcall(function()
+            if handle and hrp then
+                handle.CFrame = hrp.CFrame
+            end
+        end)
+    end
+end
+
 -- Função para pegar a arma equipada atual
 local function getEquippedTool()
     local character = localPlayer.Character
@@ -44,15 +61,12 @@ local function startReach()
         local tool = getEquippedTool()
         if tool and tool:FindFirstChild("Handle") then
             local handle = tool.Handle
-            -- Percorre os jogadores para estender a caixa de toque até eles
             for _, p in pairs(Players:GetPlayers()) do
                 if p ~= localPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
                     local hrp = p.Character.HumanoidRootPart
                     local distance = (handle.Position - hrp.Position).Magnitude
                     if distance <= reachValue then
-                        -- Simula o toque fisicamente na hitbox interna do jogo
-                        firetouchinterest(handle, hrp, 0)
-                        firetouchinterest(handle, hrp, 1)
+                        safeFireTouch(handle, hrp)
                     end
                 end
             end
@@ -72,10 +86,8 @@ local function startBoxReach()
                 if p ~= localPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
                     local hrp = p.Character.HumanoidRootPart
                     local distance = (handle.Position - hrp.Position).Magnitude
-                    -- Verifica se está dentro do limite configurado na TextBox
                     if distance <= boxReachValue then
-                        firetouchinterest(handle, hrp, 0)
-                        firetouchinterest(handle, hrp, 1)
+                        safeFireTouch(handle, hrp)
                     end
                 end
             end
@@ -96,8 +108,7 @@ local function startHandlerSkill()
                 local hrp = targetPlayer.Character.HumanoidRootPart
                 local distance = (handle.Position - hrp.Position).Magnitude
                 if distance <= handlerValue then
-                    firetouchinterest(handle, hrp, 0)
-                    firetouchinterest(handle, hrp, 1)
+                    safeFireTouch(handle, hrp)
                 end
             end
         end
@@ -175,12 +186,17 @@ local ListLayout = Instance.new("UIListLayout")
 ListLayout.Padding = UDim.new(0, 5)
 ListLayout.Parent = AbaAlvosFrame
 
-local AbaControlesFrame = Instance.new("Frame")
+local AbaControlesFrame = Instance.new("ScrollingFrame")
 AbaControlesFrame.Size = UDim2.new(1, -20, 0, 210)
 AbaControlesFrame.Position = UDim2.new(0, 10, 0, 85)
 AbaControlesFrame.BackgroundTransparency = 1
 AbaControlesFrame.Visible = true
+AbaControlesFrame.ScrollBarThickness = 5
 AbaControlesFrame.Parent = MainFrame
+
+local ControlsLayout = Instance.new("UIListLayout")
+ControlsLayout.Padding = UDim.new(0, 10)
+ControlsLayout.Parent = AbaControlesFrame
 
 TabAlvos.MouseButton1Click:Connect(function()
     AbaAlvosFrame.Visible = true
@@ -231,15 +247,14 @@ refreshPlayerList()
 -- GERADOR DE COMPONENTES INTERNOS DA ABA 2
 -- ==========================================
 
-local function createFunctionRow(nameLabel, defaultValue, yPos, toggleCallback, textCallback)
+local function createFunctionRow(nameLabel, defaultValue, toggleCallback, textCallback)
     local RowFrame = Instance.new("Frame")
-    RowFrame.Size = UDim2.new(1, 0, 0, 60)
-    RowFrame.Position = UDim2.new(0, 0, 0, yPos)
+    RowFrame.Size = UDim2.new(1, 0, 0, 50)
     RowFrame.BackgroundTransparency = 1
     RowFrame.Parent = AbaControlesFrame
     
     local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(1, 0, 0, 20)
+    Label.Size = UDim2.new(0.6, 0, 1, 0)
     Label.Text = nameLabel
     Label.TextColor3 = Color3.fromRGB(240, 240, 240)
     Label.Font = Enum.Font.SourceSansBold
@@ -249,4 +264,68 @@ local function createFunctionRow(nameLabel, defaultValue, yPos, toggleCallback, 
     Label.Parent = RowFrame
     
     local TextBox = Instance.new("TextBox")
-    TextBox.Size = UDim2.new(0, 120, 0, 32)
+    TextBox.Size = UDim2.new(0, 80, 0, 32)
+    TextBox.Position = UDim2.new(0.61, 0, 0.15, 0)
+    TextBox.BackgroundColor3 = Color3.fromRGB(45, 50, 60)
+    TextBox.Text = tostring(defaultValue)
+    TextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    TextBox.Font = Enum.Font.SourceSans
+    TextBox.TextSize = 14
+    TextBox.Parent = RowFrame
+    Instance.new("UICorner", TextBox).CornerRadius = UDim.new(0, 4)
+    
+    TextBox.FocusLost:Connect(function()
+        local num = tonumber(TextBox.Text)
+        if num then
+            textCallback(num)
+        end
+    end)
+    
+    local ToggleBtn = Instance.new("TextButton")
+    ToggleBtn.Size = UDim2.new(0, 100, 0, 32)
+    ToggleBtn.Position = UDim2.new(0.78, 0, 0.15, 0)
+    ToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+    ToggleBtn.Text = "DESLIGADO"
+    ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ToggleBtn.Font = Enum.Font.SourceSansBold
+    ToggleBtn.TextSize = 13
+    ToggleBtn.Parent = RowFrame
+    Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 4)
+    
+    local activeState = false
+    ToggleBtn.MouseButton1Click:Connect(function()
+        activeState = not activeState
+        if activeState then
+            ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 160, 80)
+            ToggleBtn.Text = "LIGADO"
+        else
+            ToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+            ToggleBtn.Text = "DESLIGADO"
+        end
+        toggleCallback(activeState)
+    end)
+end
+
+-- Criando os controles na Aba 2
+createFunctionRow("Reach Padrão", reachValue, function(state)
+    reachActive = state
+    if state then startReach() end
+end, function(val)
+    reachValue = val
+end)
+
+createFunctionRow("Box Reach", boxReachValue, function(state)
+    boxReachActive = state
+    if state then startBoxReach() end
+end, function(val)
+    boxReachValue = val
+end)
+
+createFunctionRow("Handler Skill (Alvo)", handlerValue, function(state)
+    handlerActive = state
+    if state then startHandlerSkill() end
+end, function(val)
+    handlerValue = val
+end)
+
+AbaControlesFrame.CanvasSize = UDim2.new(0, 0, 0, ControlsLayout.AbsoluteContentSize.Y + 20)
