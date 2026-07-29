@@ -1,5 +1,5 @@
 -- ==========================================
--- TESTE ISOLADO: 6ª ABA (PROTEÇÕES + IY FUNCTIONS)
+-- TESTE ISOLADO: 6ª ABA (CORRIGIDO FLY E ESP)
 -- ==========================================
 
 local Players = game:GetService("Players")
@@ -9,6 +9,7 @@ local Workspace = game:GetService("Workspace")
 local Lighting = game:GetService("Lighting")
 
 local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
 
 -- Estados das Funções da 6ª Aba
 local antiVoidActive = false
@@ -39,7 +40,7 @@ Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 10)
 local Title = Instance.new("TextLabel", Frame)
 Title.Size = UDim2.new(1, 0, 0, 35)
 Title.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-Title.Text = "Teste - 6ª Aba (Proteções & IY)"
+Title.Text = "Teste - 6ª Aba (Fly & ESP Ajustados)"
 Title.TextColor3 = Color3.new(1, 1, 1)
 Title.Font = Enum.Font.SourceSansBold
 Title.TextSize = 14
@@ -57,7 +58,6 @@ UIList.HorizontalAlignment = Enum.HorizontalAlignment.Center
 UIList.SortOrder = Enum.SortOrder.LayoutOrder
 UIList.Padding = UDim.new(0, 8)
 
--- Função auxiliar para criar linhas de botões de liga/desliga com persistência
 local function createToggleRow(name, callback)
     local row = Instance.new("Frame", Scroll)
     row.Size = UDim2.new(0.9, 0, 0, 40)
@@ -96,7 +96,7 @@ local function createToggleRow(name, callback)
     end)
 end
 
--- ================= 1. ANTIVOID (Loop / Respawn Seguro) =================
+-- ================= 1. ANTIVOID =================
 createToggleRow("Antivoid", function(state)
     antiVoidActive = state
 end)
@@ -117,7 +117,7 @@ task.spawn(function()
     end
 end)
 
--- ================= 2. ANTIFLING (Loop / Respawn Seguro) =================
+-- ================= 2. ANTIFLING =================
 createToggleRow("Antifling", function(state)
     antiFlingActive = state
 end)
@@ -144,7 +144,7 @@ task.spawn(function()
     end
 end)
 
--- ================= 3. ANTI TOUCHED (Loop / Respawn Seguro) =================
+-- ================= 3. ANTI TOUCHED =================
 createToggleRow("Anti Touched (Espadas)", function(state)
     antiTouchedActive = state
 end)
@@ -167,7 +167,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- ================= 4. FLY (Com TextBox de Velocidade + Loop/Respawn) =================
+-- ================= 4. FLY (Estilo IY Real / Ajustado para Valores Baixos) =================
 local flyRow = Instance.new("Frame", Scroll)
 flyRow.Size = UDim2.new(0.9, 0, 0, 40)
 flyRow.BackgroundTransparency = 1
@@ -217,51 +217,42 @@ flyBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Motor do Fly padrão Infinite Yield adaptado para loop/respawn
-task.spawn(function()
-    local bg, bv
-    while true do
-        task.wait(0.1)
-        if flyActive then
-            pcall(function()
-                local char = LocalPlayer.Character
-                local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                local cam = Workspace.CurrentCamera
-                if hrp then
-                    if not hrp:FindFirstChild("IY_FlyBodyGyro") then
-                        bg = Instance.new("BodyGyro", hrp)
-                        bg.Name = "IY_FlyBodyGyro"
-                        bg.P = 9e4
-                        bg.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
-                        bg.CFrame = hrp.CFrame
-                    end
-                    if not hrp:FindFirstChild("IY_FlyBodyVelocity") then
-                        bv = Instance.new("BodyVelocity", hrp)
-                        bv.Name = "IY_FlyBodyVelocity"
-                        bv.Velocity = Vector3.new(0, 0.1, 0)
-                        bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-                    end
-                    bg.CFrame = cam.CFrame
-                    bv.Velocity = cam.CFrame.LookVector * flySpeed
+-- Motor de Voo IY RenderStepped (Garante velocidade fluida idêntica ao original)
+RunService.RenderStepped:Connect(function()
+    if flyActive then
+        pcall(function()
+            local char = LocalPlayer.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if hrp and hum then
+                hum.PlatformStand = true
+                local vel = Vector3.new(0, 0.1, 0)
+                local cameraCF = Camera.CFrame
+                
+                -- Movimentação direcional baseada na câmera
+                if hum.MoveDirection.Magnitude > 0 then
+                    vel = cameraCF.LookVector * (hum.MoveDirection.Z * -flySpeed) + cameraCF.RightVector * (hum.MoveDirection.X * flySpeed)
                 end
-            end)
-        else
-            pcall(function()
-                local char = LocalPlayer.Character
-                local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                if hrp then
-                    if hrp:FindFirstChild("IY_FlyBodyGyro") then hrp.IY_FlyBodyGyro:Destroy() end
-                    if hrp:FindFirstChild("IY_FlyBodyVelocity") then hrp.IY_FlyBodyVelocity:Destroy() end
-                end
-            end)
-        end
+                
+                hrp.Velocity = vel
+                hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + cameraCF.LookVector)
+            end
+        end)
+    else
+        pcall(function()
+            local char = LocalPlayer.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if hum and hum.PlatformStand then
+                hum.PlatformStand = false
+            end
+        end)
     end
 end)
 
--- ================= 5. ANTILAG (Infinite Yield Style) =================
+-- ================= 5. ANTILAG =================
 createToggleRow("AntiLag", function(state)
-    antiLagActive = state
-    if antiLagActive then
+    antiLagAction = state
+    if state then
         pcall(function()
             for _, v in ipairs(Workspace:GetDescendants()) do
                 if v:IsA("BasePart") then
@@ -281,39 +272,88 @@ createToggleRow("AntiLag", function(state)
     end
 end)
 
--- ================= 6. ESP (Infinite Yield Style) =================
+-- ================= 6. ESP (Estilo Completo IY com Box, Nick, Vida e Distância por Time) =================
 createToggleRow("ESP (Jogadores)", function(state)
     espActive = state
 end)
 
-task.spawn(function()
-    while true do
-        task.wait(1)
-        if espActive then
-            pcall(function()
-                for _, p in ipairs(Players:GetPlayers()) do
-                    if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
-                        if not p.Character.Head:FindFirstChild("IY_ESP_Highlight") then
-                            local hl = Instance.new("Highlight", p.Character.Head)
-                            hl.Name = "IY_ESP_Highlight"
-                            hl.FillColor = Color3.fromRGB(255, 0, 0)
-                            hl.OutlineColor = Color3.fromRGB(255, 255, 255)
-                            hl.FillTransparency = 0.5
-                        end
-                    end
+local espCache = {}
+
+local function removeEsp(plr)
+    if espCache[plr] then
+        for _, obj in pairs(espCache[plr]) do
+            if obj then obj:Destroy() end
+        end
+        espCache[plr] = nil
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    if not espActive then
+        for _, plr in ipairs(Players:GetPlayers()) do
+            removeEsp(plr)
+        end
+        return
+    end
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and plr.Character:FindFirstChildOfClass("Humanoid") then
+            local char = plr.Character
+            local hrp = char.HumanoidRootPart
+            local hum = char.HumanoidOfClass or char:FindFirstChildOfClass("Humanoid")
+            
+            -- Cor baseada no time (Exemplo: se estiver no mesmo time = Verde, caso contrário = Vermelho, ou ajuste conforme sua preferência)
+            local espColor = Color3.fromRGB(255, 0, 0)
+            if plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then
+                espColor = Color3.fromRGB(0, 255, 0)
+            end
+
+            if not espCache[plr] then
+                local highlight = Instance.new("Highlight")
+                highlight.Name = "IY_ESP_Box"
+                highlight.Adornee = char
+                highlight.FillColor = espColor
+                highlight.FillTransparency = 0.6
+                highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                highlight.OutlineTransparency = 0
+                highlight.Parent = char
+
+                local billboard = Instance.new("BillboardGui")
+                billboard.Name = "IY_ESP_Info"
+                billboard.Adornee = char:FindFirstChild("Head") or hrp
+                billboard.Size = UDim2.new(0, 150, 0, 50)
+                billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+                billboard.AlwaysOnTop = true
+                billboard.Parent = char
+
+                local textLabel = Instance.new("TextLabel", billboard)
+                textLabel.Name = "InfoText"
+                textLabel.Size = UDim2.new(1, 0, 1, 0)
+                textLabel.BackgroundTransparency = 1
+                textLabel.TextColor3 = espColor
+                textLabel.TextStrokeTransparency = 0
+                textLabel.Font = Enum.Font.SourceSansBold
+                textLabel.TextSize = 13
+
+                espCache[plr] = {Highlight = highlight, Billboard = billboard, Text = textLabel}
+            else
+                local cache = espCache[plr]
+                if cache.Highlight and cache.Text then
+                    cache.Highlight.FillColor = espColor
+                    cache.Text.TextColor3 = espColor
+                    local distance = math.floor((Camera.CFrame.Position - hrp.Position).Magnitude)
+                    local health = math.floor(hum.Health)
+                    cache.Text.Text = string.VFormat and string.format("%s\nVida: %d | Dist: %d", plr.Name, health, distance) or (plr.Name .. "\nVida: " .. health .. " | Dist: " .. distance)
                 end
-            end)
+            end
         else
-            pcall(function()
-                for _, p in ipairs(Players:GetPlayers()) do
-                    if p.Character and p.Character:FindFirstChild("Head") then
-                        local hl = p.Character.Head:FindFirstChild("IY_ESP_Highlight")
-                        if hl then hl:Destroy() end
-                    end
-                end
-            end)
+            removeEsp(plr)
         end
     end
 end)
 
-print("Aba 6 carregada para testes com sucesso!")
+Players.PlayerRemoving:Connect(function(plr)
+    removeEsp(plr)
+end)
+
+print("Aba 6 (Fly e ESP corrigidos) carregada com sucesso!")
