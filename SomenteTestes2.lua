@@ -1,16 +1,17 @@
--- Interface Mobile para Delta - Infinite Yield Fly Integration (100% Mobile Fix)
+-- Interface Mobile para Delta - Infinite Yield Fly Integration (Real-time Speed Fix)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
 local player = Players.LocalPlayer
 
--- Variáveis de Estado do Voo (Baseadas no IY original)
+-- Variáveis de Estado do Voo
 local FLYING = false
-local flySpeed = 20
+local flySpeed = 2 -- Equivalente a 20 de velocidade (Aumenta de 10 em 10)
+local currentBv = nil -- Referência global do BodyVelocity ativo
 
 -- Criando a ScreenGui principal
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "IYFlyMobile_Delta_Fixed"
+ScreenGui.Name = "IYFlyMobile_Delta_Final"
 ScreenGui.Parent = CoreGui:FindFirstChild("RobloxGui") or player:WaitForChild("PlayerGui")
 
 -- Frame Principal da UI
@@ -57,10 +58,9 @@ local BoxCorner = Instance.new("UICorner")
 BoxCorner.CornerRadius = UDim.new(0, 6)
 BoxCorner.Parent = SpeedBox
 
--- Função de Injeção: Captura os inputs do analógico virtual do Roblox (Mobile Controller)
+-- Função de Injeção: Captura os inputs do analógico virtual do Roblox
 local function getMobileMoveVector()
 	local activeController = nil
-	-- Tenta puxar o módulo de controle nativo do Roblox Player
 	pcall(function()
 		local PlayerScripts = player:WaitForChild("PlayerScripts")
 		local PlayerModule = require(PlayerScripts:WaitForChild("PlayerModule"))
@@ -73,13 +73,12 @@ local function getMobileMoveVector()
 	return Vector3.new(0, 0, 0)
 end
 
--- Núcleo do Comando Fly Original (Infinite Yield Adaptado para Inputs Mobile)
+-- Núcleo do Comando Fly Original (Infinite Yield Adaptado)
 local function startFly()
 	local torso = player.Character and (player.Character:FindFirstChild("HumanoidRootPart") or player.Character:FindFirstChild("Torso") or player.Character:FindFirstChild("UpperTorso"))
 	if not torso then return end
     
 	local cam = workspace.CurrentCamera
-	local speed = flySpeed
 
 	local bg = Instance.new("BodyGyro", torso)
 	bg.P = 9e4
@@ -89,19 +88,22 @@ local function startFly()
 	local bv = Instance.new("BodyVelocity", torso)
 	bv.velocity = Vector3.new(0, 0.1, 0)
 	bv.maxForce = Vector3.new(9e9, 9e9, 9e9)
+	currentBv = bv
 
 	task.spawn(function()
-		while FLYING do
+		while FLYING and currentBv == bv do
 			local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 			if humanoid then humanoid.PlatformStand = true end
             
-			-- Captura a direção exata para onde o analógico mobile está apontado
 			local moveVector = getMobileMoveVector()
-			local f = -moveVector.Z  -- Frente/Trás
-			local r = moveVector.X   -- Esquerda/Direita
+			local f = -moveVector.Z  
+			local r = moveVector.X   
+            
+			-- Multiplica flySpeed por 10 para aceitar números menores na interface
+			local calculatedSpeed = flySpeed * 10
             
 			if f ~= 0 or r ~= 0 then
-				bv.velocity = ((cam.CoordinateFrame.LookVector * f) + ((cam.CoordinateFrame * CFrame.new(r, f * .2, 0).Position) - cam.CoordinateFrame.Position)) * speed
+				bv.velocity = ((cam.CoordinateFrame.LookVector * f) + ((cam.CoordinateFrame * CFrame.new(r, f * .2, 0).Position) - cam.CoordinateFrame.Position)) * calculatedSpeed
 			else
 				bv.velocity = Vector3.new(0, 0.1, 0)
 			end
@@ -109,9 +111,9 @@ local function startFly()
 			RunService.RenderStepped:Wait()
 		end
         
-		-- Limpeza ao desligar o voo
-		bv:Destroy()
-		bg:Destroy()
+		-- Limpeza
+		if bv and bv.Parent then bv:Destroy() end
+		if bg and bg.Parent then bg:Destroy() end
 		local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 		if humanoid then humanoid.PlatformStand = false end
 	end)
@@ -127,6 +129,7 @@ local function toggleFlight(state)
 	else
 		ToggleBtn.Text = "FLY: OFF"
 		ToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+		currentBv = nil
 	end
 end
 
@@ -135,12 +138,17 @@ ToggleBtn.MouseButton1Click:Connect(function()
 	toggleFlight(not FLYING)
 end)
 
--- Atualização de Velocidade pela TextBox
-SpeedBox.FocusLost:Connect(function()
+-- Atualização Dinâmica da Velocidade (Em tempo real)
+SpeedBox:GetPropertyChangedSignal("Text"):Connect(function()
 	local num = tonumber(SpeedBox.Text)
 	if num then
 		flySpeed = num
-	else
+	end
+end)
+
+SpeedBox.FocusLost:Connect(function()
+	local num = tonumber(SpeedBox.Text)
+	if not num then
 		SpeedBox.Text = tostring(flySpeed)
 	end
 end)
@@ -149,7 +157,7 @@ end)
 player.CharacterAdded:Connect(function(newChar)
 	newChar:WaitForChild("HumanoidRootPart")
 	if FLYING then
-		task.wait(0.5) -- Tempo hábil para carregar o novo personagem completamente
+		task.wait(0.5)
 		startFly()
 	end
 end)
