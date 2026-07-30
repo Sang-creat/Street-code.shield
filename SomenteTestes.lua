@@ -8,12 +8,43 @@ local espEnabled = false
 local espContainer = nil
 local updateConnection = nil
 
+-- Criar a Interface Gráfica (Botão Flutuante) automaticamente
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "IY_ESP_GUI"
+screenGui.ResetOnSpawn = false
+
+-- Proteção para injetar no CoreGui (funciona em executores mobile como Delta)
+pcall(function()
+	screenGui.Parent = CoreGui
+end)
+if not screenGui.Parent then
+	screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+end
+
+-- Botão de Ligar/Desligar
+local textButton = Instance.new("TextButton")
+textButton.Name = "ToggleButton"
+textButton.Size = UDim2.new(0, 120, 0, 45)
+textButton.Position = UDim2.new(0, 50, 0, 50) -- Posição no canto superior esquerdo (você pode arrastar se preferir)
+textButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+textButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+textButton.TextSize = 16
+textButton.Font = Enum.Font.SourceSansBold
+textButton.Text = "ESP: OFF"
+textButton.Active = true
+textButton.Draggable = true -- Permite arrastar o botão pela tela no mobile!
+textButton.Parent = screenGui
+
+-- Arredondar as bordas do botão para ficar bonito
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(0, 8)
+uiCorner.Parent = textButton
+
 -- Função para criar a estrutura visual do ESP
 local function createIYTag(player)
 	if player == LocalPlayer then return end
 
 	local function setupCharacter(char)
-		-- Proteção contra demorarem para carregar (evita travamentos)
 		local root = char:WaitForChild("HumanoidRootPart", 3)
 		local hum = char:WaitForChild("Humanoid", 3)
 		if not root or not hum or not espContainer then return end
@@ -102,28 +133,21 @@ local function toggleESP(state)
 		end
 		if espContainer then
 			espContainer:Destroy()
-      espContainer = nil
+			espContainer = nil
 		end
 	end
 end
 
--- Vinculação segura ao Botão da Interface (Evita erro se executado direto no executor)
-local textButton = script and script.Parent and (script.Parent:IsA("TextButton") or script.Parent:IsA("ImageButton")) and script.Parent or nil
-
-if textButton then
-	textButton.MouseButton1Click:Connect(function()
-		local newState = not espEnabled
+-- Evento de clique no botão gerado
+textButton.MouseButton1Click:Connect(function()
+	local newState = not espEnabled
 	toggleESP(newState)
 	
-		if newState then
-			textButton.Text = "ESP: ON"
-			textButton.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-		else
-			textButton.Text = "ESP: OFF"
-			textButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-		end
-	end)
-else
-	-- Caso rode via executor sem botão, liga o ESP automaticamente para testes
-	toggleESP(true)
-end
+	if newState then
+		textButton.Text = "ESP: ON"
+		textButton.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+	else
+		textButton.Text = "ESP: OFF"
+		textButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+	end
+end)
