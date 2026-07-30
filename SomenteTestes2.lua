@@ -1,5 +1,5 @@
 -- ==========================================
--- TESTE ISOLADO: 6ª ABA (FLY & ESP ORIGINAIS DO IY)
+-- TESTE ISOLADO: 6ª ABA (FLY & ESP CORRIGIDOS E ESTÁVEIS)
 -- ==========================================
 
 local Players = game:GetService("Players")
@@ -40,7 +40,7 @@ Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 10)
 local Title = Instance.new("TextLabel", Frame)
 Title.Size = UDim2.new(1, 0, 0, 35)
 Title.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-Title.Text = "Teste - 6ª Aba (Fly & ESP Originais IY)"
+Title.Text = "Teste - 6ª Aba (Fly & ESP Ajustados)"
 Title.TextColor3 = Color3.new(1, 1, 1)
 Title.Font = Enum.Font.SourceSansBold
 Title.TextSize = 14
@@ -167,7 +167,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- ================= 4. FLY (CÓDIGO ORIGINAL DO INFINITE YIELD ADAPTADO) =================
+-- ================= 4. FLY (CORRIGIDO E FLUIDO - IY STYLE) =================
 local flyRow = Instance.new("Frame", Scroll)
 flyRow.Size = UDim2.new(0.9, 0, 0, 40)
 flyRow.BackgroundTransparency = 1
@@ -206,9 +206,8 @@ flyBtn.Font = Enum.Font.SourceSansBold
 flyBtn.TextSize = 12
 Instance.new("UICorner", flyBtn).CornerRadius = UDim.new(0, 6)
 
--- Variáveis de controle do Fly original do IY
-local IYKeyboard = {W = 0, S = 0, A = 0, D = 0, Up = 0, Down = 0}
 local IYConnection
+local UserInputService = game:GetService("UserInputService")
 
 flyBtn.MouseButton1Click:Connect(function()
     flyActive = not flyActive
@@ -216,20 +215,14 @@ flyBtn.MouseButton1Click:Connect(function()
         flyBtn.BackgroundColor3 = Color3.fromRGB(50, 160, 80)
         flyBtn.Text = "ON"
         
-        -- Início do Fly Original do Infinite Yield
         pcall(function()
-            local torso = LocalPlayer.Character and (LocalPlayer.Character:FindFirstChild("Torso") or LocalPlayer.Character:FindFirstChild("UpperTorso") or LocalPlayer.Character:FindFirstChild("HumanoidRootPart"))
-            local speed = flySpeed
-            local iykeys = {W = 0, S = 0, A = 0, D = 0}
+            local char = LocalPlayer.Character
+            if not char then return end
+            local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if not root or not hum then return end
             
             if IYConnection then IYConnection:Disconnect() end
-            
-            local function getRoot(char)
-                return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
-            end
-            
-            local root = getRoot(LocalPlayer.Character)
-            if not root then return end
             
             local bg = Instance.new("BodyGyro", root)
             bg.P = 9e4
@@ -237,10 +230,8 @@ flyBtn.MouseButton1Click:Connect(function()
             bg.cframe = root.CFrame
             
             local bv = Instance.new("BodyVelocity", root)
-            bv.velocity = Vector3.new(0, 0.1, 0)
+            bv.velocity = Vector3.new(0, 0, 0)
             bv.maxForce = Vector3.new(9e9, 9e9, 9e9)
-            
-            local UserInputService = game:GetService("UserInputService")
             
             IYConnection = RunService.RenderStepped:Connect(function()
                 if not flyActive then
@@ -250,13 +241,13 @@ flyBtn.MouseButton1Click:Connect(function()
                     return
                 end
                 
-                speed = flySpeed
-                local currentRoot = getRoot(LocalPlayer.Character)
-                if currentRoot and currentRoot:FindFirstChildOfClass("BodyVelocity") then
-                    local camCF = Camera.CFrame
-                    local moveDir = Vector3.new()
+                local currentRoot = LocalPlayer.Character and (LocalPlayer.Character:FindFirstChild("HumanoidRootPart") or LocalPlayer.Character:FindFirstChild("Torso"))
+                local currentHum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                
+                if currentRoot and currentHum then
+                    currentHum.PlatformStand = true
+                    bg.cframe = Camera.CFrame
                     
-                    -- Captura de inputs do teclado nativos do Roblox
                     local forward = UserInputService:IsKeyDown(Enum.KeyCode.W) and 1 or 0
                     local backward = UserInputService:IsKeyDown(Enum.KeyCode.S) and -1 or 0
                     local left = UserInputService:IsKeyDown(Enum.KeyCode.A) and -1 or 0
@@ -264,14 +255,12 @@ flyBtn.MouseButton1Click:Connect(function()
                     local up = UserInputService:IsKeyDown(Enum.KeyCode.Space) and 1 or 0
                     local down = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) and -1 or 0
                     
-                    moveDir = (camCF.LookVector * (forward + backward)) + (camCF.RightVector * (left + right)) + (Vector3.new(0, 1, 0) * (up + down))
+                    local moveDir = (Camera.CFrame.LookVector * (forward + backward)) + (Camera.CFrame.RightVector * (left + right)) + (Vector3.new(0, 1, 0) * (up + down))
                     
-                    bv.velocity = moveDir * speed
-                    bg.cframe = camCF
-                    
-                    local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-                    if hum then
-                        hum.PlatformStand = true
+                    if moveDir.Magnitude > 0 then
+                        bv.velocity = moveDir.Unit * flySpeed
+                    else
+                        bv.velocity = Vector3.new(0, 0.1, 0)
                     end
                 end
             end)
@@ -282,17 +271,19 @@ flyBtn.MouseButton1Click:Connect(function()
         pcall(function()
             if IYConnection then IYConnection:Disconnect() end
             local char = LocalPlayer.Character
-            local root = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso"))
-            if root then
-                for _, v in ipairs(root:GetChildren()) do
-                    if v:IsA("BodyVelocity") or v:IsA("BodyGyro") then
-                        v:Destroy()
+            if char then
+                local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+                if root then
+                    for _, v in ipairs(root:GetChildren()) do
+                        if v:IsA("BodyVelocity") or v:IsA("BodyGyro") then
+                            v:Destroy()
+                        end
                     end
                 end
-            end
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
-            if hum then
-                hum.PlatformStand = false
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if hum then
+                    hum.PlatformStand = false
+                end
             end
         end)
     end
@@ -300,7 +291,6 @@ end)
 
 -- ================= 5. ANTILAG =================
 createToggleRow("AntiLag", function(state)
-    antiLagAction = state
     if state then
         pcall(function()
             for _, v in ipairs(Workspace:GetDescendants()) do
@@ -321,15 +311,14 @@ createToggleRow("AntiLag", function(state)
     end
 end)
 
--- ================= 6. ESP (CÓDIGO ORIGINAL DO INFINITE YIELD ADAPTADO) =================
+-- ================= 6. ESP (COMPLETO E ROBUSTO - ESTILO IY) =================
 createToggleRow("ESP (Jogadores)", function(state)
     espActive = state
     if not state then
-        -- Remove o ESP original do IY ao desligar
         for _, plr in ipairs(Players:GetPlayers()) do
             if plr.Character then
-                local existingEsp = plr.Character:FindFirstChild("IY_ESP")
-                if existingEsp then existingEsp:Destroy() end
+                local espFolder = plr.Character:FindFirstChild("IY_ESP")
+                if espFolder then espFolder:Destroy() end
             end
         end
     end
@@ -339,53 +328,64 @@ RunService.RenderStepped:Connect(function()
     if not espActive then return end
     
     for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and plr.Character:FindFirstChildOfClass("Humanoid") then
+        if plr ~= LocalPlayer and plr.Character then
             local char = plr.Character
-            if not char:FindFirstChild("IY_ESP") then
-                local espFolder = Instance.new("Folder")
-                espFolder.Name = "IY_ESP"
-                espFolder.Parent = char
-                
-                -- Caixa (Highlight original do IY / Box)
-                local highlight = Instance.new("Highlight")
-                highlight.Name = "Box"
-                highlight.Adornee = char
-                highlight.FillColor = Color3.fromRGB(255, 0, 0)
-                highlight.FillTransparency = 0.5
-                highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-                highlight.OutlineTransparency = 0
-                highlight.Parent = espFolder
-                
-                -- Billboard para Nick, Vida e Distância
-                local billboard = Instance.new("BillboardGui")
-                billboard.Name = "Info"
-                billboard.Adornee = char:FindFirstChild("Head") or char.HumanoidRootPart
-                billboard.Size = UDim2.new(0, 200, 0, 50)
-                billboard.StudsOffset = Vector3.new(0, 2.5, 0)
-                billboard.AlwaysOnTop = true
-                billboard.Parent = espFolder
-                
-                local textLabel = Instance.new("TextLabel", billboard)
-                textLabel.Name = "Text"
-                textLabel.Size = UDim2.new(1, 0, 1, 0)
-                textLabel.BackgroundTransparency = 1
-                textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-                textLabel.TextStrokeTransparency = 0
-                textLabel.Font = Enum.Font.SourceSansBold
-                textLabel.TextSize = 14
-            else
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            local head = char:FindFirstChild("Head") or hrp
+            
+            if hrp and hum then
                 local espFolder = char:FindFirstChild("IY_ESP")
-                local textLabel = espFolder and espFolder:FindFirstChild("Info") and espFolder.Info:FindFirstChild("Text")
-                local hum = char:FindFirstChildOfClass("Humanoid")
-                local hrp = char:FindFirstChild("HumanoidRootPart")
+                if not espFolder then
+                    espFolder = Instance.new("Folder")
+                    espFolder.Name = "IY_ESP"
+                    espFolder.Parent = char
+                    
+                    local highlight = Instance.new("Highlight")
+                    highlight.Name = "Box"
+                    highlight.Adornee = char
+                    highlight.FillTransparency = 0.5
+                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    highlight.OutlineTransparency = 0
+                    highlight.Parent = espFolder
+                    
+                    local billboard = Instance.new("BillboardGui")
+                    billboard.Name = "Info"
+                    billboard.Adornee = head
+                    billboard.Size = UDim2.new(0, 200, 0, 50)
+                    billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+                    billboard.AlwaysOnTop = true
+                    billboard.Parent = espFolder
+                    
+                    local textLabel = Instance.new("TextLabel", billboard)
+                    textLabel.Name = "Text"
+                    textLabel.Size = UDim2.new(1, 0, 1, 0)
+                    textLabel.BackgroundTransparency = 1
+                    textLabel.TextStrokeTransparency = 0
+                    textLabel.Font = Enum.Font.SourceSansBold
+                    textLabel.TextSize = 14
+                    textLabel.Parent = billboard
+                end
                 
-                if textLabel and hum and hrp then
+                local highlight = espFolder:FindFirstChild("Box")
+                local textLabel = espFolder:FindFirstChild("Info") and espFolder.Info:FindFirstChild("Text")
+                
+                if highlight and textLabel then
+                    -- Determina cor (Verde se for do mesmo time, Vermelho para inimigos)
+                    local espColor = Color3.fromRGB(255, 0, 0)
+                    if plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then
+                        espColor = Color3.fromRGB(0, 255, 0)
+                    end
+                    
+                    highlight.FillColor = espColor
+                    textLabel.TextColor3 = espColor
+                    
                     local distance = math.floor((Camera.CFrame.Position - hrp.Position).Magnitude)
-                    textLabel.Text = plr.Name .. "\nVida: " .. math.floor(hum.Health) .. " | Dist: " .. distance
+                    textLabel.Text = string.format("%s\nVida: %d | Dist: %d", plr.Name, math.floor(hum.Health), distance)
                 end
             end
         end
     end
 end)
 
-print("Aba 6 (Fly e ESP originais do IY) carregada com sucesso!")
+print("Aba 6 carregada com correções definitivas de Fly e ESP!")
