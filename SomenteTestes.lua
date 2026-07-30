@@ -1,27 +1,28 @@
 -- Serviços do Roblox
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local CoreGui = game:GetService("CoreGui") -- Impede que o ESP suma quando seu personagem morre
+local CoreGui = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
 local espEnabled = false
 local espContainer = nil
 local updateConnection = nil
 
--- Função para criar a estrutura visual idêntica à do Infinite Yield
+-- Função para criar a estrutura visual do ESP
 local function createIYTag(player)
 	if player == LocalPlayer then return end
 
 	local function setupCharacter(char)
-		local root = char:WaitForChild("HumanoidRootPart", 5)
-		local hum = char:WaitForChild("Humanoid", 5)
-		if not root or not hum then return end
+		-- Proteção contra demorarem para carregar (evita travamentos)
+		local root = char:WaitForChild("HumanoidRootPart", 3)
+		local hum = char:WaitForChild("Humanoid", 3)
+		if not root or not hum or not espContainer then return end
 
 		-- Cria ou limpa tag existente no container
 		local existing = espContainer:FindFirstChild(player.Name)
 		if existing then existing:Destroy() end
 
-		-- Estrutura idêntica de BillboardGui do IY
+		-- Estrutura de BillboardGui
 		local billboard = Instance.new("BillboardGui")
 		billboard.Name = player.Name
 		billboard.AlwaysOnTop = true
@@ -30,19 +31,19 @@ local function createIYTag(player)
 		billboard.Adornee = root
 		billboard.Parent = espContainer
 
-		-- Label de Nome/Nick (Igual ao layout do Infinite Yield)
+		-- Label de Nome/Nick
 		local nameLabel = Instance.new("TextLabel")
 		nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
 		nameLabel.BackgroundTransparency = 1
 		nameLabel.Text = player.Name
-		nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255) -- Cor padrão branca do IY
-		nameLabel.TextStrokeTransparency = 0 -- Borda preta essencial do IY
+		nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+		nameLabel.TextStrokeTransparency = 0
 		nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 		nameLabel.TextSize = 14
 		nameLabel.Font = Enum.Font.SourceSansBold
 		nameLabel.Parent = billboard
 
-		-- Label de Informações (HP e Distância em Studs)
+		-- Label de Informações (HP e Distância)
 		local infoLabel = Instance.new("TextLabel")
 		infoLabel.Size = UDim2.new(1, 0, 0.5, 0)
 		infoLabel.Position = UDim2.new(0, 0, 0.5, 0)
@@ -54,7 +55,7 @@ local function createIYTag(player)
 		infoLabel.Font = Enum.Font.SourceSansBold
 		infoLabel.Parent = billboard
 
-		-- Loop de atualização em tempo real por personagem (HP e Studs)
+		-- Loop de atualização em tempo real
 		local connection
 		connection = RunService.RenderStepped:Connect(function()
 			if not espEnabled or not billboard or not billboard.Parent or not char:IsDescendantOf(workspace) then
@@ -62,10 +63,12 @@ local function createIYTag(player)
 				return
 			end
 
-			if root and hum and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-				local distance = math.floor((root.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude)
+			local localChar = LocalPlayer.Character
+			local localRoot = localChar and localChar:FindFirstChild("HumanoidRootPart")
+
+			if root and hum and localRoot then
+				local distance = math.floor((root.Position - localRoot.Position).Magnitude)
 				local hp = math.floor(hum.Health)
-				-- Formatação exata exibida no Infinite Yield (HP: X | Dist: Y studs)
 				infoLabel.Text = "HP: " .. hp .. " | Dist: " .. distance .. " studs"
 			else
 				infoLabel.Text = "HP: N/A | Dist: N/A studs"
@@ -84,41 +87,43 @@ local function toggleESP(state)
 	espEnabled = state
 	
 	if espEnabled then
-		-- Cria um container seguro no CoreGui (assim ele nunca quebra ou some quando você morre)
 		espContainer = Instance.new("Folder")
 		espContainer.Name = "IY_ESP_Container"
 		espContainer.Parent = CoreGui
 
-		-- Ativa para todos os jogadores atuais e futuros
 		for _, p in ipairs(Players:GetPlayers()) do
 			createIYTag(p)
 		end
 		updateConnection = Players.PlayerAdded:Connect(createIYTag)
 	else
-		-- Desativação completa e limpeza total de memória
 		if updateConnection then
 			updateConnection:Disconnect()
 			updateConnection = nil
 		end
 		if espContainer then
 			espContainer:Destroy()
-			espContainer = nil
+      espContainer = nil
 		end
 	end
 end
 
--- Vinculação ao Botão da Interface
-local textButton = script.Parent
-textButton.MouseButton1Click:Connect(function()
-	local newState = not espEnabled
+-- Vinculação segura ao Botão da Interface (Evita erro se executado direto no executor)
+local textButton = script and script.Parent and (script.Parent:IsA("TextButton") or script.Parent:IsA("ImageButton")) and script.Parent or nil
+
+if textButton then
+	textButton.MouseButton1Click:Connect(function()
+		local newState = not espEnabled
 	toggleESP(newState)
 	
-	-- Mantém o feedback visual do botão conforme o clique
-	if newState then
-		textButton.Text = "ESP: ON"
-		textButton.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-	else
-		textButton.Text = "ESP: OFF"
-		textButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-	end
-end)
+		if newState then
+			textButton.Text = "ESP: ON"
+			textButton.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+		else
+			textButton.Text = "ESP: OFF"
+			textButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+		end
+	end)
+else
+	-- Caso rode via executor sem botão, liga o ESP automaticamente para testes
+	toggleESP(true)
+end
