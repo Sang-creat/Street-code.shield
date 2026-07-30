@@ -1,5 +1,5 @@
 -- ==========================================
--- TESTE ISOLADO: 6ª ABA (CORRIGIDO FLY E ESP)
+-- TESTE ISOLADO: 6ª ABA (FLY E IY CORRIGIDOS)
 -- ==========================================
 
 local Players = game:GetService("Players")
@@ -7,6 +7,7 @@ local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
 local Workspace = game:GetService("Workspace")
 local Lighting = game:GetService("Lighting")
+local UserInputService = game:GetService("UserInputService")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
@@ -20,6 +21,12 @@ local flyActive = false
 local flySpeed = 50
 local antiLagActive = false
 local espActive = false
+
+-- Variáveis de Controle do Motor de Voo
+local IY_CONTROL = {F = 0, B = 0, L = 0, R = 0, Q = 0, E = 0}
+local flyConnection = nil
+local flyBV = nil
+local flyBG = nil
 
 -- Janela de Teste Isolada para a 6ª Aba
 if CoreGui:FindFirstChild("TestAba6Gui") then
@@ -40,7 +47,7 @@ Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 10)
 local Title = Instance.new("TextLabel", Frame)
 Title.Size = UDim2.new(1, 0, 0, 35)
 Title.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-Title.Text = "Teste - 6ª Aba (Fly & ESP Ajustados)"
+Title.Text = "Teste - 6ª Aba (Fly Corrigido)"
 Title.TextColor3 = Color3.new(1, 1, 1)
 Title.Font = Enum.Font.SourceSansBold
 Title.TextSize = 14
@@ -50,7 +57,7 @@ local Scroll = Instance.new("ScrollingFrame", Frame)
 Scroll.Position = UDim2.new(0, 0, 0, 40)
 Scroll.Size = UDim2.new(1, 0, 1, -40)
 Scroll.BackgroundTransparency = 1
-Scroll.CanvasSize = UDim2.new(0, 0, 0, 350)
+Scroll.CanvasSize = UDim2.new(0, 0, 0, 400)
 Scroll.ScrollBarThickness = 4
 
 local UIList = Instance.new("UIListLayout", Scroll)
@@ -167,14 +174,92 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- ================= 4. FLY (Estilo IY Real / Ajustado para Valores Baixos) =================
+-- ================= MOTOR DE VOO CORRIGIDO E ADAPTADO =================
+local function startFly()
+    pcall(function()
+        if flyBV then flyBV:Destroy() end
+        if flyBG then flyBG:Destroy() end
+    end)
+    
+    local char = LocalPlayer.Character
+    if not char then return end
+    local torso = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not torso or not hum then return end
+
+    flyActive = true
+    hum.PlatformStand = true
+
+    flyBG = Instance.new("BodyGyro", torso)
+    flyBG.P = 9e4
+    flyBG.maxTorque = Vector3.new(9e9, 9e9, 9e9)
+    flyBG.cframe = torso.CFrame
+
+    flyBV = Instance.new("BodyVelocity", torso)
+    flyBV.velocity = Vector3.new(0, 0.1, 0)
+    flyBV.maxForce = Vector3.new(9e9, 9e9, 9e9)
+
+    flyConnection = RunService.RenderStepped:Connect(function()
+        pcall(function()
+            if not torso or not torso.Parent or not hum or hum.Health <= 0 then return end
+            
+            local moveDir = hum.MoveDirection
+            local camCF = Camera.CFrame
+            local vel = Vector3.new(0, 0.1, 0)
+
+            -- Suporte tanto para comandos de tecla (PC) quanto para o analógico/movimento do Mobile
+            if IY_CONTROL.F + IY_CONTROL.B ~= 0 or IY_CONTROL.L + IY_CONTROL.R ~= 0 then
+                vel = ((camCF.LookVector * (IY_CONTROL.F + IY_CONTROL.B)) + (camCF.RightVector * (IY_CONTROL.L + IY_CONTROL.R))) * flySpeed
+            elseif moveDir.Magnitude > 0 then
+                vel = moveDir * flySpeed
+            end
+
+            flyBV.velocity = vel
+            flyBG.cframe = camCF
+        end)
+    end)
+end
+
+local function stopFly()
+    flyActive = false
+    if flyConnection then flyConnection:Disconnect() flyConnection = nil end
+    pcall(function()
+        local char = LocalPlayer.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hum then hum.PlatformStand = false end
+        if flyBV then flyBV:Destroy() flyBV = nil end
+        if flyBG then flyBG:Destroy() flyBG = nil end
+    end)
+end
+
+-- Captura de Teclado (Opcional para PC)
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe or not flyActive then return end
+    local key = input.KeyCode
+    if key == Enum.KeyCode.W then IY_CONTROL.F = 1
+    elseif key == Enum.KeyCode.S then IY_CONTROL.B = -1
+    elseif key == Enum.KeyCode.A then IY_CONTROL.L = -1
+    elseif key == Enum.KeyCode.D then IY_CONTROL.R = 1
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input, gpe)
+    local key = input.KeyCode
+    if key == Enum.KeyCode.W then IY_CONTROL.F = 0
+    elseif key == Enum.KeyCode.S then IY_CONTROL.B = 0
+    elseif key == Enum.KeyCode.A then IY_CONTROL.L = 0
+    elseif key == Enum.KeyCode.D then IY_CONTROL.R = 0
+    end
+end)
+
+-- UI do Fly com TextBox
 local flyRow = Instance.new("Frame", Scroll)
 flyRow.Size = UDim2.new(0.9, 0, 0, 40)
 flyRow.BackgroundTransparency = 1
 
 local flyLbl = Instance.new("TextLabel", flyRow)
 flyLbl.Size = UDim2.new(0.4, 0, 1, 0)
-flyLbl.Text = "Fly (IY Style)"
+flyLbl.Text = "Fly (IY Speed)"
 flyLbl.TextColor3 = Color3.fromRGB(240, 240, 240)
 flyLbl.Font = Enum.Font.SourceSansBold
 flyLbl.TextSize = 13
@@ -211,149 +296,10 @@ flyBtn.MouseButton1Click:Connect(function()
     if flyActive then
         flyBtn.BackgroundColor3 = Color3.fromRGB(50, 160, 80)
         flyBtn.Text = "ON"
+        startFly()
     else
         flyBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
         flyBtn.Text = "OFF"
+        stopFly()
     end
 end)
-
--- Motor de Voo IY RenderStepped (Garante velocidade fluida idêntica ao original)
-RunService.RenderStepped:Connect(function()
-    if flyActive then
-        pcall(function()
-            local char = LocalPlayer.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
-            if hrp and hum then
-                hum.PlatformStand = true
-                local vel = Vector3.new(0, 0.1, 0)
-                local cameraCF = Camera.CFrame
-                
-                -- Movimentação direcional baseada na câmera
-                if hum.MoveDirection.Magnitude > 0 then
-                    vel = cameraCF.LookVector * (hum.MoveDirection.Z * -flySpeed) + cameraCF.RightVector * (hum.MoveDirection.X * flySpeed)
-                end
-                
-                hrp.Velocity = vel
-                hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + cameraCF.LookVector)
-            end
-        end)
-    else
-        pcall(function()
-            local char = LocalPlayer.Character
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
-            if hum and hum.PlatformStand then
-                hum.PlatformStand = false
-            end
-        end)
-    end
-end)
-
--- ================= 5. ANTILAG =================
-createToggleRow("AntiLag", function(state)
-    antiLagAction = state
-    if state then
-        pcall(function()
-            for _, v in ipairs(Workspace:GetDescendants()) do
-                if v:IsA("BasePart") then
-                    v.Material = Enum.Material.SmoothPlastic
-                    v.Reflectance = 0
-                elseif v:IsA("Decal") or v:IsA("Texture") then
-                    v.Transparency = 1
-                end
-            end
-            Lighting.GlobalShadows = false
-            Lighting.FogEnd = 9e9
-        end)
-    else
-        pcall(function()
-            Lighting.GlobalShadows = true
-        end)
-    end
-end)
-
--- ================= 6. ESP (Estilo Completo IY com Box, Nick, Vida e Distância por Time) =================
-createToggleRow("ESP (Jogadores)", function(state)
-    espActive = state
-end)
-
-local espCache = {}
-
-local function removeEsp(plr)
-    if espCache[plr] then
-        for _, obj in pairs(espCache[plr]) do
-            if obj then obj:Destroy() end
-        end
-        espCache[plr] = nil
-    end
-end
-
-RunService.RenderStepped:Connect(function()
-    if not espActive then
-        for _, plr in ipairs(Players:GetPlayers()) do
-            removeEsp(plr)
-        end
-        return
-    end
-
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and plr.Character:FindFirstChildOfClass("Humanoid") then
-            local char = plr.Character
-            local hrp = char.HumanoidRootPart
-            local hum = char.HumanoidOfClass or char:FindFirstChildOfClass("Humanoid")
-            
-            -- Cor baseada no time (Exemplo: se estiver no mesmo time = Verde, caso contrário = Vermelho, ou ajuste conforme sua preferência)
-            local espColor = Color3.fromRGB(255, 0, 0)
-            if plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then
-                espColor = Color3.fromRGB(0, 255, 0)
-            end
-
-            if not espCache[plr] then
-                local highlight = Instance.new("Highlight")
-                highlight.Name = "IY_ESP_Box"
-                highlight.Adornee = char
-                highlight.FillColor = espColor
-                highlight.FillTransparency = 0.6
-                highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-                highlight.OutlineTransparency = 0
-                highlight.Parent = char
-
-                local billboard = Instance.new("BillboardGui")
-                billboard.Name = "IY_ESP_Info"
-                billboard.Adornee = char:FindFirstChild("Head") or hrp
-                billboard.Size = UDim2.new(0, 150, 0, 50)
-                billboard.StudsOffset = Vector3.new(0, 2.5, 0)
-                billboard.AlwaysOnTop = true
-                billboard.Parent = char
-
-                local textLabel = Instance.new("TextLabel", billboard)
-                textLabel.Name = "InfoText"
-                textLabel.Size = UDim2.new(1, 0, 1, 0)
-                textLabel.BackgroundTransparency = 1
-                textLabel.TextColor3 = espColor
-                textLabel.TextStrokeTransparency = 0
-                textLabel.Font = Enum.Font.SourceSansBold
-                textLabel.TextSize = 13
-
-                espCache[plr] = {Highlight = highlight, Billboard = billboard, Text = textLabel}
-            else
-                local cache = espCache[plr]
-                if cache.Highlight and cache.Text then
-                    cache.Highlight.FillColor = espColor
-                    cache.Text.TextColor3 = espColor
-                    local distance = math.floor((Camera.CFrame.Position - hrp.Position).Magnitude)
-                    local health = math.floor(hum.Health)
-                    cache.Text.Text = string.VFormat and string.format("%s\nVida: %d | Dist: %d", plr.Name, health, distance) or (plr.Name .. "\nVida: " .. health .. " | Dist: " .. distance)
-                end
-            end
-        else
-            removeEsp(plr)
-        end
-    end
-end)
-
-Players.PlayerRemoving:Connect(function(plr)
-    removeEsp(plr)
-end)
-
-print("Aba 6 (Fly e ESP corrigidos) carregada com sucesso!")
