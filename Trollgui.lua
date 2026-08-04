@@ -453,17 +453,25 @@ LoopBringBtn.MouseButton1Click:Connect(function()
         
         task.spawn(function()
             local connection
-            connection = RunService.RenderStepped:Connect(function()
+            connection = RunService.Heartbeat:Connect(function()
                 if not loopBringActive then
                     connection:Disconnect()
                     return
                 end
                 pcall(function()
-                    if selectedTargetPlayer.Character and selectedTargetPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                            local targetHRP = selectedTargetPlayer.Character.HumanoidRootPart
-                            local myHRP = LocalPlayer.Character.HumanoidRootPart
+                    local tChar = selectedTargetPlayer.Character
+                    local mChar = LocalPlayer.Character
+                    if tChar and mChar then
+                        local targetHRP = tChar:FindFirstChild("HumanoidRootPart")
+                        local myHRP = mChar:FindFirstChild("HumanoidRootPart")
+                        if targetHRP and myHRP then
+                            for _, part in ipairs(tChar:GetDescendants()) do
+                                if part:IsA("BasePart") then
+                                    part.CanCollide = false
+                                end
+                            end
                             targetHRP.CFrame = myHRP.CFrame * CFrame.new(0, 0, -3)
+                            targetHRP.Velocity = Vector3.new(0, 0, 0)
                         end
                     end
                 end)
