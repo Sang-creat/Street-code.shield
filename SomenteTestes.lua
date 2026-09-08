@@ -6,16 +6,14 @@ local UserInputService = game:GetService("UserInputService")
 
 local LocalPlayer = Players.LocalPlayer
 
---// Variáveis de Controle Global (Persistentes para conexões e loops)
-getgenv().MacroRunning = getgenv().MacroRunning or false
+--// Variáveis de Controle Global
 getgenv().SelectedTarget = getgenv().SelectedTarget or nil
 getgenv().VoidModeActive = getgenv().VoidModeActive or false
 getgenv().FlingModeActive = getgenv().FlingModeActive or false
 
--- Ponto seguro no Void (Coordenadas de altura/vazio controladas)
 local VOID_POSITION = Vector3.new(0, -450, 0)
 
--- Limpeza de interface anterior caso já exista
+-- Limpeza de interface anterior
 if CoreGui:FindFirstChild("TrollHub_PortoLeste") then
     CoreGui.TrollHub_PortoLeste:Destroy()
 end
@@ -29,7 +27,7 @@ ScreenGui.ResetOnSpawn = false
 -- Botão Flutuante Superior Direito (Abrir/Fechar o Menu)
 local ToggleButton = Instance.new("TextButton")
 ToggleButton.Size = UDim2.new(0, 45, 0, 45)
-ToggleButton.Position = UDim2.new(1, -55, 0, 15) -- Canto superior direito
+ToggleButton.Position = UDim2.new(1, -55, 0, 15)
 ToggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 ToggleButton.Text = "HUB"
@@ -54,7 +52,7 @@ local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(0, 10)
 UICorner.Parent = MainFrame
 
--- Sistema de Arrastar com o dedo (Mobile Draggable otimizado)
+-- Sistema de Arrastar com o dedo (Mobile Draggable)
 local dragging, dragInput, dragStart, startPos
 
 MainFrame.InputBegan:Connect(function(input)
@@ -89,14 +87,8 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- Ação do Botão Flutuante (Toggle Visibilidade)
 ToggleButton.MouseButton1Click:Connect(function()
     MainFrame.Visible = not MainFrame.Visible
-    if MainFrame.Visible then
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    else
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
-    end
 end)
 
 local Title = Instance.new("TextLabel")
@@ -108,7 +100,7 @@ Title.TextSize = 15
 Title.Font = Enum.Font.GothamBold
 Title.Parent = MainFrame
 
--- Lista de Alvos (ScrollingFrame)
+-- Lista de Alvos
 local TargetScroll = Instance.new("ScrollingFrame")
 TargetScroll.Size = UDim2.new(0.9, 0, 0, 160)
 TargetScroll.Position = UDim2.new(0.05, 0, 0, 50)
@@ -155,7 +147,7 @@ Players.PlayerAdded:Connect(UpdatePlayerList)
 Players.PlayerRemoving:Connect(UpdatePlayerList)
 UpdatePlayerList()
 
--- Botão Função 1: Void + Auto-Equip Pós-ForceField + Kill
+-- Botões da Interface
 local BtnVoid = Instance.new("TextButton")
 BtnVoid.Size = UDim2.new(0.9, 0, 0, 45)
 BtnVoid.Position = UDim2.new(0.05, 0, 0, 225)
@@ -165,27 +157,19 @@ BtnVoid.Text = "Modo Void + Auto-Kill [OFF]"
 BtnVoid.TextSize = 13
 BtnVoid.Font = Enum.Font.GothamBold
 BtnVoid.Parent = MainFrame
+Instance.new("UICorner", BtnVoid).CornerRadius = UDim.new(0, 6)
 
-local UICornerBtn1 = Instance.new("UICorner")
-UICornerBtn1.CornerRadius = UDim.new(0, 6)
-UICornerBtn1.Parent = BtnVoid
-
--- Botão Função 2: WalkFling + Void Caça Contínua
 local BtnFling = Instance.new("TextButton")
 BtnFling.Size = UDim2.new(0.9, 0, 0, 45)
 BtnFling.Position = UDim2.new(0.05, 0, 0, 280)
 BtnFling.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
 BtnFling.TextColor3 = Color3.fromRGB(255, 255, 255)
-BtnFling.Text = "Modo WalkFling + Alvo [OFF]"
+BtnFling.Text = "Modo Trava + Alvo [OFF]"
 BtnFling.TextSize = 13
 BtnFling.Font = Enum.Font.GothamBold
 BtnFling.Parent = MainFrame
+Instance.new("UICorner", BtnFling).CornerRadius = UDim.new(0, 6)
 
-local UICornerBtn2 = Instance.new("UICorner")
-UICornerBtn2.CornerRadius = UDim.new(0, 6)
-UICornerBtn2.Parent = BtnFling
-
--- Botão de Fechar/Apagar Hub Completo
 local BtnClose = Instance.new("TextButton")
 BtnClose.Size = UDim2.new(0.9, 0, 0, 35)
 BtnClose.Position = UDim2.new(0.05, 0, 0, 355)
@@ -195,18 +179,15 @@ BtnClose.Text = "Desativar e Fechar Script"
 BtnClose.TextSize = 12
 BtnClose.Font = Enum.Font.Gotham
 BtnClose.Parent = MainFrame
+Instance.new("UICorner", BtnClose).CornerRadius = UDim.new(0, 6)
 
-local UICornerClose = Instance.new("UICorner")
-UICornerClose.CornerRadius = UDim.new(0, 6)
-UICornerClose.Parent = BtnClose
-
---// Sistema de Anti-Void Base
+--// Sistema de Anti-Void Base (Reconhece novo personagem ao renascer)
 RunService.Heartbeat:Connect(function()
     if getgenv().VoidModeActive or getgenv().FlingModeActive then
         local char = LocalPlayer.Character
-        if char and char:FindFirstChild("HumanoidRootPart") then
-            local hrp = char.HumanoidRootPart
-            if hrp.Position.Y < -300 then
+        if char then
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if hrp and hrp.Position.Y < -300 then
                 hrp.CFrame = CFrame.new(VOID_POSITION)
                 hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
             end
@@ -214,13 +195,13 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
---// Lógica da Função 1
+--// Lógica da Função 1 (Void + Auto-Kill com persistência de Respawn)
 BtnVoid.MouseButton1Click:Connect(function()
     getgenv().VoidModeActive = not getgenv().VoidModeActive
     if getgenv().VoidModeActive then
         getgenv().FlingModeActive = false
         BtnFling.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
-        BtnFling.Text = "Modo WalkFling + Alvo [OFF]"
+        BtnFling.Text = "Modo Trava + Alvo [OFF]"
         
         BtnVoid.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
         BtnVoid.Text = "Modo Void + Auto-Kill [ON]"
@@ -256,8 +237,9 @@ task.spawn(function()
                             task.wait(0.05)
                         until not target.Character or not target.Character:FindFirstChildOfClass("Humanoid") or target.Character.Humanoid.Health <= 0
                         
-                        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                            LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(VOID_POSITION)
+                        local currentMyChar = LocalPlayer.Character
+                        if currentMyChar and currentMyChar:FindFirstChild("HumanoidRootPart") then
+                            currentMyChar.HumanoidRootPart.CFrame = CFrame.new(VOID_POSITION)
                         end
                     end
                 end
@@ -266,7 +248,7 @@ task.spawn(function()
     end
 end)
 
---// Lógica da Função 2
+--// Lógica da Função 2 (Modo Trava Estável - Sem Fling violento que trava o boneco)
 BtnFling.MouseButton1Click:Connect(function()
     getgenv().FlingModeActive = not getgenv().FlingModeActive
     if getgenv().FlingModeActive then
@@ -275,10 +257,17 @@ BtnFling.MouseButton1Click:Connect(function()
         BtnVoid.Text = "Modo Void + Auto-Kill [OFF]"
         
         BtnFling.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
-        BtnFling.Text = "Modo WalkFling + Alvo [ON]"
+        BtnFling.Text = "Modo Trava + Alvo [ON]"
     else
         BtnFling.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
-        BtnFling.Text = "Modo WalkFling + Alvo [OFF]"
+        BtnFling.Text = "Modo Trava + Alvo [OFF]"
+        
+        -- Restaura o estado normal do Humanoid caso estivesse travado
+        local myChar = LocalPlayer.Character
+        if myChar then
+            local myHum = myChar:FindFirstChildOfClass("Humanoid")
+            if myHum then myHum.PlatformStand = false end
+        end
     end
 end)
 
@@ -292,10 +281,10 @@ RunService.Stepped:Connect(function()
             local myHum = myChar:FindFirstChildOfClass("Humanoid")
             
             if tHrp and myHrp and myHum then
-                myHrp.CFrame = tHrp.CFrame
-                myHrp.AssemblyLinearVelocity = Vector3.new(30000, 30000, 30000)
-                myHrp.AssemblyAngularVelocity = Vector3.new(99999, 99999, 99999)
-                myHum.PlatformStand = true
+                -- Posicionamento firme nas costas sem forçar velocidades absurdas que o anti-cheat pune
+                myHrp.CFrame = tHrp.CFrame * CFrame.new(0, 0, 2)
+                myHrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                myHum.PlatformStand = false
             end
         end
     end
@@ -305,5 +294,10 @@ end)
 BtnClose.MouseButton1Click:Connect(function()
     getgenv().VoidModeActive = false
     getgenv().FlingModeActive = false
+    local myChar = LocalPlayer.Character
+    if myChar then
+        local myHum = myChar:FindFirstChildOfClass("Humanoid")
+        if myHum then myHum.PlatformStand = false end
+    end
     ScreenGui:Destroy()
 end)
