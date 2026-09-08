@@ -12,6 +12,7 @@ getgenv().VoidModeActive = getgenv().VoidModeActive or false
 getgenv().FlingModeActive = getgenv().FlingModeActive or false
 
 local VOID_POSITION = Vector3.new(0, -450, 0)
+local lastTargetPosition = CFrame.new(0, 5, 0) -- Armazena a última posição segura para retorno
 
 -- Limpeza de interface anterior
 if CoreGui:FindFirstChild("TrollHub_PortoLeste") then
@@ -181,7 +182,7 @@ BtnClose.Font = Enum.Font.Gotham
 BtnClose.Parent = MainFrame
 Instance.new("UICorner", BtnClose).CornerRadius = UDim.new(0, 6)
 
---// Sistema de Anti-Void Base (Reconhece novo personagem ao renascer)
+--// Sistema de Anti-Void Base
 RunService.Heartbeat:Connect(function()
     if getgenv().VoidModeActive or getgenv().FlingModeActive then
         local char = LocalPlayer.Character
@@ -195,7 +196,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
---// Lógica da Função 1 (Void + Auto-Kill com persistência de Respawn)
+--// Lógica da Função 1 (Void + Auto-Kill com Timeout de 3.7s)
 BtnVoid.MouseButton1Click:Connect(function()
     getgenv().VoidModeActive = not getgenv().VoidModeActive
     if getgenv().VoidModeActive then
@@ -208,12 +209,17 @@ BtnVoid.MouseButton1Click:Connect(function()
     else
         BtnVoid.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
         BtnVoid.Text = "Modo Void + Auto-Kill [OFF]"
+        
+        local myChar = LocalPlayer.Character
+        if myChar and myChar:FindFirstChild("HumanoidRootPart") then
+            myChar.HumanoidRootPart.CFrame = lastTargetPosition + Vector3.new(0, 3, 0)
+        end
     end
 end)
 
 task.spawn(function()
     while true do
-        task.wait(0.1)
+        task.wait(0.2)
         if getgenv().VoidModeActive then
             local target = getgenv().SelectedTarget
             if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
@@ -221,6 +227,8 @@ task.spawn(function()
                 local tHrp = tChar.HumanoidRootPart
                 local tForceField = tChar:FindFirstChildOfClass("ForceField")
                 local tHum = tChar:FindFirstChildOfClass("Humanoid")
+                
+                lastTargetPosition = tHrp.CFrame
                 
                 local myChar = LocalPlayer.Character
                 local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
@@ -233,13 +241,28 @@ task.spawn(function()
                         local offset = tHrp.CFrame.LookVector * -1
                         myHrp.CFrame = CFrame.new(tHrp.Position + offset + Vector3.new(0, 0, 0), tHrp.Position)
                         
+                        local startTime = tick()
+                        local successKill = false
+                        
                         repeat
                             task.wait(0.05)
-                        until not target.Character or not target.Character:FindFirstChildOfClass("Humanoid") or target.Character.Humanoid.Health <= 0
+                            if not target.Character or not target.Character:FindFirstChildOfClass("Humanoid") or target.Character.Humanoid.Health <= 0 then
+                                successKill = true
+                                break
+                            end
+                            -- Timeout ajustado para 3.7 segundos
+                            if tick() - startTime > 3.7 then
+                                break
+                            end
+                        until not getgenv().VoidModeActive
                         
                         local currentMyChar = LocalPlayer.Character
                         if currentMyChar and currentMyChar:FindFirstChild("HumanoidRootPart") then
                             currentMyChar.HumanoidRootPart.CFrame = CFrame.new(VOID_POSITION)
+                        end
+                        
+                        if not successKill then
+                            task.wait(3)
                         end
                     end
                 end
@@ -248,7 +271,7 @@ task.spawn(function()
     end
 end)
 
---// Lógica da Função 2 (Modo Trava Estável - Sem Fling violento que trava o boneco)
+--// Lógica da Função 2 (Modo Trava)
 BtnFling.MouseButton1Click:Connect(function()
     getgenv().FlingModeActive = not getgenv().FlingModeActive
     if getgenv().FlingModeActive then
@@ -262,7 +285,6 @@ BtnFling.MouseButton1Click:Connect(function()
         BtnFling.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
         BtnFling.Text = "Modo Trava + Alvo [OFF]"
         
-        -- Restaura o estado normal do Humanoid caso estivesse travado
         local myChar = LocalPlayer.Character
         if myChar then
             local myHum = myChar:FindFirstChildOfClass("Humanoid")
@@ -281,8 +303,7 @@ RunService.Stepped:Connect(function()
             local myHum = myChar:FindFirstChildOfClass("Humanoid")
             
             if tHrp and myHrp and myHum then
-                -- Posicionamento firme nas costas sem forçar velocidades absurdas que o anti-cheat pune
-                myHrp.CFrame = tHrp.CFrame * CFrame.new(0, 0, 2)
+                myHrp.CFrame = tHrp.CFrame * CFrame.new(0, 0, 1.5)
                 myHrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
                 myHum.PlatformStand = false
             end
