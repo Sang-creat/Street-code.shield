@@ -2,6 +2,7 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
 
 local LocalPlayer = Players.LocalPlayer
 
@@ -19,29 +20,91 @@ if CoreGui:FindFirstChild("TrollHub_PortoLeste") then
     CoreGui.TrollHub_PortoLeste:Destroy()
 end
 
---// Construção da Interface Gráfica (GUI)
+--// Construção da Interface Gráfica (GUI) Adaptada para Mobile
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "TrollHub_PortoLeste"
 ScreenGui.Parent = CoreGui
 ScreenGui.ResetOnSpawn = false
 
+-- Botão Flutuante Superior Direito (Abrir/Fechar o Menu)
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Size = UDim2.new(0, 45, 0, 45)
+ToggleButton.Position = UDim2.new(1, -55, 0, 15) -- Canto superior direito
+ToggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleButton.Text = "HUB"
+ToggleButton.TextSize = 13
+ToggleButton.Font = Enum.Font.GothamBold
+ToggleButton.Parent = ScreenGui
+
+local UICornerToggle = Instance.new("UICorner")
+UICornerToggle.CornerRadius = UDim.new(0, 8)
+UICornerToggle.Parent = ToggleButton
+
+-- Janela Principal
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 320, 0, 420)
-MainFrame.Position = UDim2.new(0.05, 0, 0.2, 0)
+MainFrame.Position = UDim2.new(0.5, -160, 0.3, -210)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 MainFrame.BorderSizePixel = 0
+MainFrame.Visible = true
 MainFrame.Parent = ScreenGui
 
 local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.CornerRadius = UDim.new(0, 10)
 UICorner.Parent = MainFrame
+
+-- Sistema de Arrastar com o dedo (Mobile Draggable otimizado)
+local dragging, dragInput, dragStart, startPos
+
+MainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+MainFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(
+            startPos.X.Scale, 
+            startPos.X.Offset + delta.X, 
+            startPos.Y.Scale, 
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+-- Ação do Botão Flutuante (Toggle Visibilidade)
+ToggleButton.MouseButton1Click:Connect(function()
+    MainFrame.Visible = not MainFrame.Visible
+    if MainFrame.Visible then
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    else
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+    end
+end)
 
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundTransparency = 1
 Title.Text = "Porto Leste - Tactical Hub"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextSize = 16
+Title.TextSize = 15
 Title.Font = Enum.Font.GothamBold
 Title.Parent = MainFrame
 
@@ -68,7 +131,7 @@ local function UpdatePlayerList()
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
             local pButton = Instance.new("TextButton")
-            pButton.Size = UDim2.new(1, 0, 0, 30)
+            pButton.Size = UDim2.new(1, 0, 0, 35)
             pButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
             pButton.TextColor3 = Color3.fromRGB(200, 200, 200)
             pButton.Text = player.Name
@@ -78,6 +141,9 @@ local function UpdatePlayerList()
             
             pButton.MouseButton1Click:Connect(function()
                 getgenv().SelectedTarget = player
+                for _, b in ipairs(TargetScroll:GetChildren()) do
+                    if b:IsA("TextButton") then b.BackgroundColor3 = Color3.fromRGB(45, 45, 45) end
+                end
                 pButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
             end)
         end
@@ -96,7 +162,7 @@ BtnVoid.Position = UDim2.new(0.05, 0, 0, 225)
 BtnVoid.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
 BtnVoid.TextColor3 = Color3.fromRGB(255, 255, 255)
 BtnVoid.Text = "Modo Void + Auto-Kill [OFF]"
-BtnVoid.TextSize = 14
+BtnVoid.TextSize = 13
 BtnVoid.Font = Enum.Font.GothamBold
 BtnVoid.Parent = MainFrame
 
@@ -111,7 +177,7 @@ BtnFling.Position = UDim2.new(0.05, 0, 0, 280)
 BtnFling.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
 BtnFling.TextColor3 = Color3.fromRGB(255, 255, 255)
 BtnFling.Text = "Modo WalkFling + Alvo [OFF]"
-BtnFling.TextSize = 14
+BtnFling.TextSize = 13
 BtnFling.Font = Enum.Font.GothamBold
 BtnFling.Parent = MainFrame
 
@@ -119,14 +185,14 @@ local UICornerBtn2 = Instance.new("UICorner")
 UICornerBtn2.CornerRadius = UDim.new(0, 6)
 UICornerBtn2.Parent = BtnFling
 
--- Botão de Fechar GUI
+-- Botão de Fechar/Apagar Hub Completo
 local BtnClose = Instance.new("TextButton")
 BtnClose.Size = UDim2.new(0.9, 0, 0, 35)
 BtnClose.Position = UDim2.new(0.05, 0, 0, 355)
 BtnClose.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 BtnClose.TextColor3 = Color3.fromRGB(255, 255, 255)
-BtnClose.Text = "Minimizar / Ocultar"
-BtnClose.TextSize = 13
+BtnClose.Text = "Desativar e Fechar Script"
+BtnClose.TextSize = 12
 BtnClose.Font = Enum.Font.Gotham
 BtnClose.Parent = MainFrame
 
@@ -134,7 +200,7 @@ local UICornerClose = Instance.new("UICorner")
 UICornerClose.CornerRadius = UDim.new(0, 6)
 UICornerClose.Parent = BtnClose
 
---// Sistema de Anti-Void Base (Mantém seguro no vácuo se ativado)
+--// Sistema de Anti-Void Base
 RunService.Heartbeat:Connect(function()
     if getgenv().VoidModeActive or getgenv().FlingModeActive then
         local char = LocalPlayer.Character
@@ -148,11 +214,11 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
---// Lógica da Função 1: Void -> Espera ForceField cair -> Teleporta com Gear a 1 Stud -> Mata -> Repete
+--// Lógica da Função 1
 BtnVoid.MouseButton1Click:Connect(function()
     getgenv().VoidModeActive = not getgenv().VoidModeActive
     if getgenv().VoidModeActive then
-        getgenv().FlingModeActive = false -- Desativa a outra função para evitar conflito
+        getgenv().FlingModeActive = false
         BtnFling.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
         BtnFling.Text = "Modo WalkFling + Alvo [OFF]"
         
@@ -180,20 +246,16 @@ task.spawn(function()
                 
                 if tHum and tHum.Health > 0 and myHrp then
                     if tForceField then
-                        -- Se o alvo tem ForceField, fica seguro no Void aguardando a queda
                         myHrp.CFrame = CFrame.new(VOID_POSITION)
                         myHrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
                     else
-                        -- Assim que o ForceField sai, teleporte imediato a 1 stud nas costas
                         local offset = tHrp.CFrame.LookVector * -1
                         myHrp.CFrame = CFrame.new(tHrp.Position + offset + Vector3.new(0, 0, 0), tHrp.Position)
                         
-                        -- Aguarda o ciclo de abate e o alvo morrer para puxar de volta ao void
                         repeat
                             task.wait(0.05)
                         until not target.Character or not target.Character:FindFirstChildOfClass("Humanoid") or target.Character.Humanoid.Health <= 0
                         
-                        -- Alvo morto, retorna ao void para reiniciar o ciclo
                         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
                             LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(VOID_POSITION)
                         end
@@ -204,11 +266,11 @@ task.spawn(function()
     end
 end)
 
---// Lógica da Função 2: WalkFling + Atribuição de Caça Contínua (Bypass ForceField via colisão/void)
+--// Lógica da Função 2
 BtnFling.MouseButton1Click:Connect(function()
     getgenv().FlingModeActive = not getgenv().FlingModeActive
     if getgenv().FlingModeActive then
-        getgenv().VoidModeActive = false -- Desativa a outra função
+        getgenv().VoidModeActive = false
         BtnVoid.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
         BtnVoid.Text = "Modo Void + Auto-Kill [OFF]"
         
@@ -220,7 +282,6 @@ BtnFling.MouseButton1Click:Connect(function()
     end
 end)
 
--- Motor de WalkFling Dinâmico (Gera torque e velocidade de colisão severa)
 RunService.Stepped:Connect(function()
     if getgenv().FlingModeActive then
         local target = getgenv().SelectedTarget
@@ -231,7 +292,6 @@ RunService.Stepped:Connect(function()
             local myHum = myChar:FindFirstChildOfClass("Humanoid")
             
             if tHrp and myHrp and myHum then
-                -- Gruda na posição do alvo gerando instabilidade física (Fling)
                 myHrp.CFrame = tHrp.CFrame
                 myHrp.AssemblyLinearVelocity = Vector3.new(30000, 30000, 30000)
                 myHrp.AssemblyAngularVelocity = Vector3.new(99999, 99999, 99999)
@@ -241,18 +301,9 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- Ação do botão de fechar/minimizar interface
-local minimized = false
+-- Botão de fechar definitivo
 BtnClose.MouseButton1Click:Connect(function()
-    minimized = not minimized
-    TargetScroll.Visible = not minimized
-    BtnVoid.Visible = not minimized
-    BtnFling.Visible = not minimized
-    if minimized then
-        MainFrame.Size = UDim2.new(0, 320, 0, 80)
-        BtnClose.Text = "Restaurar Painel"
-    else
-        MainFrame.Size = UDim2.new(0, 320, 0, 420)
-        BtnClose.Text = "Minimizar / Ocultar"
-    end
+    getgenv().VoidModeActive = false
+    getgenv().FlingModeActive = false
+    ScreenGui:Destroy()
 end)
