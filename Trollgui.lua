@@ -1,5 +1,5 @@
 -- ==========================================
--- SCRIPT: TROLL HUB MOBILE - MASTER (6 ABAS INTEGRADAS)
+-- SCRIPT: TROLL HUB MOBILE - MASTER (7 ABAS INTEGRADAS)
 -- ==========================================
 
 local Players = game:GetService("Players")
@@ -71,7 +71,7 @@ local antiVoidTask = nil
 local antiFlingTask = nil
 local antiTouchedConn = nil
 
--- Grupos de Gears
+-- Grupos de Gears (Aba 3)
 local GearGroups = {
     {Name = "DEFESA", Color = Color3.fromRGB(52, 152, 219), Gears = {94794847, 236441643, 80661504}, Active = false},
     {Name = "ESPADAS", Color = Color3.fromRGB(231, 76, 60), Gears = {99119240, 93136746, 108158379, 268586231}, Active = false},
@@ -79,6 +79,13 @@ local GearGroups = {
     {Name = "2-ATAQUE INDIRETO", Color = Color3.fromRGB(241, 196, 15), Gears = {127506257, 108158379, 70476425}, Active = false},
     {Name = "3-ATAQUE DIRETO OP", Color = Color3.fromRGB(155, 89, 182), Gears = {127506257, 268586231, 1117745433}, Active = false},
     {Name = "INVISIBILIDADE", Color = Color3.fromRGB(149, 165, 166), Special = true, CapaID = 129471121, Active = false}
+}
+
+-- Gears Individuais (Aba 7)
+local IndividualGears = {
+    {Name = "Azure Dragon", Color = Color3.fromRGB(41, 128, 185), ID = 268586231, Active = false},
+    {Name = "Espada Biografic", Color = Color3.fromRGB(192, 57, 43), ID = 66416579, Active = false},
+    {Name = "Sabre de Luz", Color = Color3.fromRGB(39, 174, 96), ID = 1208300505, Active = false}
 }
 
 -- Remove GUI anterior se já existir
@@ -175,6 +182,7 @@ CloseScriptBtn.MouseButton1Click:Connect(function()
     if espContainer then espContainer:Destroy() end
 
     for _, g in ipairs(GearGroups) do g.Active = false end
+    for _, ig in ipairs(IndividualGears) do ig.Active = false end
 
     ScreenGui:Destroy()
 end)
@@ -192,7 +200,7 @@ TabBar.Size = UDim2.new(1, 0, 0, 30)
 local TabListLayout = Instance.new("UIListLayout", TabBar)
 TabListLayout.FillDirection = Enum.FillDirection.Horizontal
 TabListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-TabListLayout.Padding = UDim.new(0, 2)
+TabListLayout.Padding = UDim.new(0, 1)
 
 -- Container Geral de Páginas
 local PageContainer = Instance.new("Frame", MainFrame)
@@ -221,6 +229,7 @@ local PageGears = createPage()
 local PageCombat, CombatLayout = createPage()
 local PageExtra, ExtraLayout = createPage()
 local PageProt, ProtLayout = createPage()
+local PageIndiv, IndivLayout = createPage()
 PageAlvo.Visible = true
 
 local function switchPage(targetPage)
@@ -230,17 +239,18 @@ local function switchPage(targetPage)
     PageCombat.Visible = false
     PageExtra.Visible = false
     PageProt.Visible = false
+    PageIndiv.Visible = false
     targetPage.Visible = true
 end
 
 local function createTabButton(name, targetPage)
     local btn = Instance.new("TextButton", TabBar)
     btn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-    btn.Size = UDim2.new(0.158, 0, 0.8, 0)
+    btn.Size = UDim2.new(0.138, 0, 0.8, 0)
     btn.Font = Enum.Font.SourceSansBold
     btn.Text = name
     btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.TextSize = 10
+    btn.TextSize = 9
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
     
     btn.MouseButton1Click:Connect(function()
@@ -254,6 +264,7 @@ createTabButton("3.Gears", PageGears)
 createTabButton("4.Comb", PageCombat)
 createTabButton("5.Extra", PageExtra)
 createTabButton("6.Prot", PageProt)
+createTabButton("7.Indiv", PageIndiv)
 
 -- ================= PAGE 1: SELEÇÃO DE ALVO =================
 local function createSectionTitle(parent, text)
@@ -1537,9 +1548,72 @@ espBtn.MouseButton1Click:Connect(function()
     end
 end)
 
+-- ================= PAGE 7: GEARS INDIVIDUAIS =================
+createSectionTitle(PageIndiv, "Auto-Equip de Gears Individuais:")
+
+local function startIndividualGearLoop(ig)
+    task.spawn(function()
+        while ig.Active do
+            if AvatarMainRE then
+                pcall(function()
+                    AvatarMainRE:FireServer({["id"] = ig.ID, ["event"] = "equip", ["equiptype"] = "Gear"})
+                end)
+            end
+            task.wait(2)
+        end
+    end)
+end
+
+for _, ig in ipairs(IndividualGears) do
+    local IndivContainer = Instance.new("Frame", PageIndiv)
+    IndivContainer.BackgroundTransparency = 1
+    IndivContainer.Size = UDim2.new(0.9, 0, 0, 42)
+
+    local btn = Instance.new("TextButton", IndivContainer)
+    btn.BackgroundColor3 = ig.Color
+    btn.Size = UDim2.new(0.72, 0, 1, 0)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.Text = ig.Name
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.TextSize = 12
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+
+    local toggleKey = Instance.new("TextButton", IndivContainer)
+    toggleKey.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
+    toggleKey.Position = UDim2.new(0.76, 0, 0, 0)
+    toggleKey.Size = UDim2.new(0.24, 0, 1, 0)
+    toggleKey.Font = Enum.Font.SourceSansBold
+    toggleKey.Text = "OFF"
+    toggleKey.TextColor3 = Color3.new(1, 1, 1)
+    toggleKey.TextSize = 12
+    Instance.new("UICorner", toggleKey).CornerRadius = UDim.new(0, 6)
+
+    local function updateKeyVisual()
+        if ig.Active then
+            toggleKey.Text = "ON"
+            toggleKey.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+        else
+            toggleKey.Text = "OFF"
+            toggleKey.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
+        end
+    end
+
+    local function toggleGearState()
+        ig.Active = not ig.Active
+        if ig.Active then
+            startIndividualGearLoop(ig)
+        end
+        updateKeyVisual()
+    end
+
+    btn.MouseButton1Click:Connect(toggleGearState)
+    toggleKey.MouseButton1Click:Connect(toggleGearState)
+end
+
 -- Ajustes finais de CanvasSize das abas
 PageCombat.CanvasSize = UDim2.new(0, 0, 0, CombatLayout.AbsoluteContentSize.Y + 20)
 PageExtra.CanvasSize = UDim2.new(0, 0, 0, ExtraLayout.AbsoluteContentSize.Y + 20)
 PageProt.CanvasSize = UDim2.new(0, 0, 0, ProtLayout.AbsoluteContentSize.Y + 20)
+PageIndiv.CanvasSize = UDim2.new(0, 0, 0, IndivLayout.AbsoluteContentSize.Y + 20)
 
-print("Troll Hub Master Mobile carregado com sucesso (6 Abas + Botão Fechar)!")
+print("Troll Hub Master Mobile com 7 Abas carregado com sucesso!")
