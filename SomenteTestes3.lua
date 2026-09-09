@@ -13,14 +13,14 @@ getgenv().FlingModeActive = getgenv().FlingModeActive or false
 getgenv().WalkFlingActive = getgenv().WalkFlingActive or false
 
 local VOID_POSITION = Vector3.new(0, -450, 0)
-local lastTargetPosition = CFrame.new(0, 5, 0) -- Armazena a última posição segura para retorno
+local lastTargetPosition = CFrame.new(0, 5, 0)
 
 -- Limpeza de interface anterior
 if CoreGui:FindFirstChild("TrollHub_PortoLeste") then
     CoreGui.TrollHub_PortoLeste:Destroy()
 end
 
---// Construção da Interface Gráfica (GUI) Adaptada para Mobile (Aumentada levemente em altura para caber o novo botão)
+--// Construção da Interface Gráfica (GUI) Adaptada para Mobile
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "TrollHub_PortoLeste"
 ScreenGui.Parent = CoreGui
@@ -172,7 +172,7 @@ BtnFling.Font = Enum.Font.GothamBold
 BtnFling.Parent = MainFrame
 Instance.new("UICorner", BtnFling).CornerRadius = UDim.new(0, 6)
 
--- Novo Botão Exclusivo para o WalkFling Original do Infinite Yield
+-- Botão Exclusivo do WalkFling Livre (Infinite Yield)
 local BtnWalkFling = Instance.new("TextButton")
 BtnWalkFling.Size = UDim2.new(0.9, 0, 0, 40)
 BtnWalkFling.Position = UDim2.new(0.05, 0, 0, 305)
@@ -248,7 +248,7 @@ task.spawn(function()
                         myHrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
                     else
                         local offset = tHrp.CFrame.LookVector * -1
-                        myHrp.CFrame = CFrame.new(tHrp.Position + offset + Vector3.new(0, 0, 0), tHrp.Position)
+                        myHrp.CFrame = CFrame.new(tHrp.Position + offset + Vector3.new(0, 0, 0), tHrapPosition)
                         
                         local startTime = tick()
                         local successKill = false
@@ -279,7 +279,7 @@ task.spawn(function()
     end
 end)
 
---// Lógica da Função 2 (Modo Trava / Alvo Original)
+--// Lógica da Função 2 (Modo Trava / Alvo)
 BtnFling.MouseButton1Click:Connect(function()
     getgenv().FlingModeActive = not getgenv().FlingModeActive
     if getgenv().FlingModeActive then
@@ -315,7 +315,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
---// Lógica da Função 3 (WalkFling Oficial Extraído do Infinite Yield)
+--// Lógica da Função 3 (WalkFling Livre do Infinite Yield - Funciona ao esbarrar em qualquer um)
 BtnWalkFling.MouseButton1Click:Connect(function()
     getgenv().WalkFlingActive = not getgenv().WalkFlingActive
     if getgenv().WalkFlingActive then
@@ -333,23 +333,20 @@ BtnWalkFling.MouseButton1Click:Connect(function()
     end
 end)
 
--- Implementação exata da mecânica de fling direcional do Infinite Yield adaptada para loop persistente
+-- Código exato extraído da fonte do Infinite Yield para o WalkFling por colisão livre (Persistente ao renascer)
 RunService.Stepped:Connect(function()
     if getgenv().WalkFlingActive then
-        local target = getgenv().SelectedTarget
         local myChar = LocalPlayer.Character
-        if target and target.Character and myChar then
-            local tHrp = target.Character:FindFirstChild("HumanoidRootPart")
+        if myChar then
             local myHrp = myChar:FindFirstChild("HumanoidRootPart")
             local myHum = myChar:FindFirstChildOfClass("Humanoid")
             
-            if tHrp and myHrp and myHum then
+            if myHrp and myHum then
                 myHum.PlatformStand = true
                 
-                -- Lógica pura de arremesso do Infinite Yield
+                -- O motor de física do IY aplica rotação/velocidade massiva constante no HRP
                 local vel = myHrp.AssemblyLinearVelocity
-                myHrp.AssemblyLinearVelocity = Vector3.new(30000, 30000, 30000)
-                myHrp.CFrame = tHrp.CFrame
+                myHrp.AssemblyLinearVelocity = Vector3.new(0, 30000, 0) + Vector3.new(math.random(-10,10), 0, math.random(-10,10))
                 
                 task.defer(function()
                     if myHrp and myHrp.Parent then
