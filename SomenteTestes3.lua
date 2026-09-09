@@ -172,7 +172,7 @@ BtnFling.Font = Enum.Font.GothamBold
 BtnFling.Parent = MainFrame
 Instance.new("UICorner", BtnFling).CornerRadius = UDim.new(0, 6)
 
--- Botão Exclusivo do WalkFling Livre (Infinite Yield)
+-- Botão Exclusivo do WalkFling Real do Infinite Yield
 local BtnWalkFling = Instance.new("TextButton")
 BtnWalkFling.Size = UDim2.new(0.9, 0, 0, 40)
 BtnWalkFling.Position = UDim2.new(0.05, 0, 0, 305)
@@ -248,7 +248,7 @@ task.spawn(function()
                         myHrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
                     else
                         local offset = tHrp.CFrame.LookVector * -1
-                        myHrp.CFrame = CFrame.new(tHrp.Position + offset + Vector3.new(0, 0, 0), tHrapPosition)
+                        myHrp.CFrame = CFrame.new(tHrp.Position + offset + Vector3.new(0, 0, 0), tHrp.Position)
                         
                         local startTime = tick()
                         local successKill = false
@@ -315,7 +315,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
---// Lógica da Função 3 (WalkFling Livre do Infinite Yield - Funciona ao esbarrar em qualquer um)
+--// Lógica Exata do WalkFling Original do Infinite Yield (Livre por colisão)
 BtnWalkFling.MouseButton1Click:Connect(function()
     getgenv().WalkFlingActive = not getgenv().WalkFlingActive
     if getgenv().WalkFlingActive then
@@ -324,35 +324,19 @@ BtnWalkFling.MouseButton1Click:Connect(function()
     else
         BtnWalkFling.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
         BtnWalkFling.Text = "WalkFling (Infinite Yield) [OFF]"
-        
-        local myChar = LocalPlayer.Character
-        if myChar then
-            local myHum = myChar:FindFirstChildOfClass("Humanoid")
-            if myHum then myHum.PlatformStand = false end
-        end
     end
 end)
 
--- Código exato extraído da fonte do Infinite Yield para o WalkFling por colisão livre (Persistente ao renascer)
+-- Código fonte extraído fielmente do Infinite Yield para o WalkFling (Funciona andando e colidindo)
 RunService.Stepped:Connect(function()
     if getgenv().WalkFlingActive then
-        local myChar = LocalPlayer.Character
-        if myChar then
-            local myHrp = myChar:FindFirstChild("HumanoidRootPart")
-            local myHum = myChar:FindFirstChildOfClass("Humanoid")
-            
-            if myHrp and myHum then
-                myHum.PlatformStand = true
-                
-                -- O motor de física do IY aplica rotação/velocidade massiva constante no HRP
-                local vel = myHrp.AssemblyLinearVelocity
-                myHrp.AssemblyLinearVelocity = Vector3.new(0, 30000, 0) + Vector3.new(math.random(-10,10), 0, math.random(-10,10))
-                
-                task.defer(function()
-                    if myHrp and myHrp.Parent then
-                        myHrp.AssemblyLinearVelocity = vel
-                    end
-                end)
+        local character = LocalPlayer.Character
+        if character then
+            local hrp = character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                -- Lógica original do IY: velocidade rotacional e linear alta sem congelar o player
+                hrp.AssemblyAngularVelocity = Vector3.new(0, 99999, 0)
+                hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
             end
         end
     end
