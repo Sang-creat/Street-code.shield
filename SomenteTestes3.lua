@@ -10,6 +10,7 @@ local LocalPlayer = Players.LocalPlayer
 getgenv().SelectedTarget = getgenv().SelectedTarget or nil
 getgenv().VoidModeActive = getgenv().VoidModeActive or false
 getgenv().FlingModeActive = getgenv().FlingModeActive or false
+getgenv().WalkFlingActive = getgenv().WalkFlingActive or false
 
 local VOID_POSITION = Vector3.new(0, -450, 0)
 local lastTargetPosition = CFrame.new(0, 5, 0) -- Armazena a última posição segura para retorno
@@ -19,7 +20,7 @@ if CoreGui:FindFirstChild("TrollHub_PortoLeste") then
     CoreGui.TrollHub_PortoLeste:Destroy()
 end
 
---// Construção da Interface Gráfica (GUI) Adaptada para Mobile
+--// Construção da Interface Gráfica (GUI) Adaptada para Mobile (Aumentada levemente em altura para caber o novo botão)
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "TrollHub_PortoLeste"
 ScreenGui.Parent = CoreGui
@@ -42,8 +43,8 @@ UICornerToggle.Parent = ToggleButton
 
 -- Janela Principal
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 320, 0, 420)
-MainFrame.Position = UDim2.new(0.5, -160, 0.3, -210)
+MainFrame.Size = UDim2.new(0, 320, 0, 475)
+MainFrame.Position = UDim2.new(0.5, -160, 0.3, -237)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 MainFrame.BorderSizePixel = 0
 MainFrame.Visible = true
@@ -103,8 +104,8 @@ Title.Parent = MainFrame
 
 -- Lista de Alvos
 local TargetScroll = Instance.new("ScrollingFrame")
-TargetScroll.Size = UDim2.new(0.9, 0, 0, 160)
-TargetScroll.Position = UDim2.new(0.05, 0, 0, 50)
+TargetScroll.Size = UDim2.new(0.9, 0, 0, 150)
+TargetScroll.Position = UDim2.new(0.05, 0, 0, 45)
 TargetScroll.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 TargetScroll.BorderSizePixel = 0
 TargetScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -150,8 +151,8 @@ UpdatePlayerList()
 
 -- Botões da Interface
 local BtnVoid = Instance.new("TextButton")
-BtnVoid.Size = UDim2.new(0.9, 0, 0, 45)
-BtnVoid.Position = UDim2.new(0.05, 0, 0, 225)
+BtnVoid.Size = UDim2.new(0.9, 0, 0, 40)
+BtnVoid.Position = UDim2.new(0.05, 0, 0, 205)
 BtnVoid.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
 BtnVoid.TextColor3 = Color3.fromRGB(255, 255, 255)
 BtnVoid.Text = "Modo Void + Auto-Kill [OFF]"
@@ -161,19 +162,31 @@ BtnVoid.Parent = MainFrame
 Instance.new("UICorner", BtnVoid).CornerRadius = UDim.new(0, 6)
 
 local BtnFling = Instance.new("TextButton")
-BtnFling.Size = UDim2.new(0.9, 0, 0, 45)
-BtnFling.Position = UDim2.new(0.05, 0, 0, 280)
+BtnFling.Size = UDim2.new(0.9, 0, 0, 40)
+BtnFling.Position = UDim2.new(0.05, 0, 0, 255)
 BtnFling.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
 BtnFling.TextColor3 = Color3.fromRGB(255, 255, 255)
-BtnFling.Text = "Modo WalkFling + Alvo [OFF]"
+BtnFling.Text = "Modo Trava + Alvo [OFF]"
 BtnFling.TextSize = 13
 BtnFling.Font = Enum.Font.GothamBold
 BtnFling.Parent = MainFrame
 Instance.new("UICorner", BtnFling).CornerRadius = UDim.new(0, 6)
 
+-- Novo Botão Exclusivo para o WalkFling Original do Infinite Yield
+local BtnWalkFling = Instance.new("TextButton")
+BtnWalkFling.Size = UDim2.new(0.9, 0, 0, 40)
+BtnWalkFling.Position = UDim2.new(0.05, 0, 0, 305)
+BtnWalkFling.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+BtnWalkFling.TextColor3 = Color3.fromRGB(255, 255, 255)
+BtnWalkFling.Text = "WalkFling (Infinite Yield) [OFF]"
+BtnWalkFling.TextSize = 13
+BtnWalkFling.Font = Enum.Font.GothamBold
+BtnWalkFling.Parent = MainFrame
+Instance.new("UICorner", BtnWalkFling).CornerRadius = UDim.new(0, 6)
+
 local BtnClose = Instance.new("TextButton")
 BtnClose.Size = UDim2.new(0.9, 0, 0, 35)
-BtnClose.Position = UDim2.new(0.05, 0, 0, 355)
+BtnClose.Position = UDim2.new(0.05, 0, 0, 365)
 BtnClose.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 BtnClose.TextColor3 = Color3.fromRGB(255, 255, 255)
 BtnClose.Text = "Desativar e Fechar Script"
@@ -184,7 +197,7 @@ Instance.new("UICorner", BtnClose).CornerRadius = UDim.new(0, 6)
 
 --// Sistema de Anti-Void Base
 RunService.Heartbeat:Connect(function()
-    if getgenv().VoidModeActive or getgenv().FlingModeActive then
+    if getgenv().VoidModeActive or getgenv().FlingModeActive or getgenv().WalkFlingActive then
         local char = LocalPlayer.Character
         if char then
             local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -196,14 +209,10 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
---// Lógica da Função 1 (Void + Auto-Kill com Timeout de 3.7s)
+--// Lógica da Função 1 (Void + Auto-Kill)
 BtnVoid.MouseButton1Click:Connect(function()
     getgenv().VoidModeActive = not getgenv().VoidModeActive
     if getgenv().VoidModeActive then
-        getgenv().FlingModeActive = false
-        BtnFling.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
-        BtnFling.Text = "Modo WalkFling + Alvo [OFF]"
-        
         BtnVoid.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
         BtnVoid.Text = "Modo Void + Auto-Kill [ON]"
     else
@@ -270,19 +279,15 @@ task.spawn(function()
     end
 end)
 
---// Lógica da Função 2 (Modo WalkFling adaptado do Infinite Yield)
+--// Lógica da Função 2 (Modo Trava / Alvo Original)
 BtnFling.MouseButton1Click:Connect(function()
     getgenv().FlingModeActive = not getgenv().FlingModeActive
     if getgenv().FlingModeActive then
-        getgenv().VoidModeActive = false
-        BtnVoid.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
-        BtnVoid.Text = "Modo Void + Auto-Kill [OFF]"
-        
         BtnFling.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
-        BtnFling.Text = "Modo WalkFling + Alvo [ON]"
+        BtnFling.Text = "Modo Trava + Alvo [ON]"
     else
         BtnFling.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
-        BtnFling.Text = "Modo WalkFling + Alvo [OFF]"
+        BtnFling.Text = "Modo Trava + Alvo [OFF]"
         
         local myChar = LocalPlayer.Character
         if myChar then
@@ -292,7 +297,6 @@ BtnFling.MouseButton1Click:Connect(function()
     end
 end)
 
--- Loop principal do WalkFling integrando a lógica padrão extraída do Infinite Yield
 RunService.Stepped:Connect(function()
     if getgenv().FlingModeActive then
         local target = getgenv().SelectedTarget
@@ -303,9 +307,46 @@ RunService.Stepped:Connect(function()
             local myHum = myChar:FindFirstChildOfClass("Humanoid")
             
             if tHrp and myHrp and myHum then
+                myHrp.CFrame = tHrp.CFrame * CFrame.new(0, 0, 1.5)
+                myHrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                myHum.PlatformStand = false
+            end
+        end
+    end
+end)
+
+--// Lógica da Função 3 (WalkFling Oficial Extraído do Infinite Yield)
+BtnWalkFling.MouseButton1Click:Connect(function()
+    getgenv().WalkFlingActive = not getgenv().WalkFlingActive
+    if getgenv().WalkFlingActive then
+        BtnWalkFling.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
+        BtnWalkFling.Text = "WalkFling (Infinite Yield) [ON]"
+    else
+        BtnWalkFling.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+        BtnWalkFling.Text = "WalkFling (Infinite Yield) [OFF]"
+        
+        local myChar = LocalPlayer.Character
+        if myChar then
+            local myHum = myChar:FindFirstChildOfClass("Humanoid")
+            if myHum then myHum.PlatformStand = false end
+        end
+    end
+end)
+
+-- Implementação exata da mecânica de fling direcional do Infinite Yield adaptada para loop persistente
+RunService.Stepped:Connect(function()
+    if getgenv().WalkFlingActive then
+        local target = getgenv().SelectedTarget
+        local myChar = LocalPlayer.Character
+        if target and target.Character and myChar then
+            local tHrp = target.Character:FindFirstChild("HumanoidRootPart")
+            local myHrp = myChar:FindFirstChild("HumanoidRootPart")
+            local myHum = myChar:FindFirstChildOfClass("Humanoid")
+            
+            if tHrp and myHrp and myHum then
                 myHum.PlatformStand = true
                 
-                -- Lógica original de cálculo de fling do Infinite Yield (Velocidade e Giro de Impacto)
+                -- Lógica pura de arremesso do Infinite Yield
                 local vel = myHrp.AssemblyLinearVelocity
                 myHrp.AssemblyLinearVelocity = Vector3.new(30000, 30000, 30000)
                 myHrp.CFrame = tHrp.CFrame
@@ -324,6 +365,7 @@ end)
 BtnClose.MouseButton1Click:Connect(function()
     getgenv().VoidModeActive = false
     getgenv().FlingModeActive = false
+    getgenv().WalkFlingActive = false
     local myChar = LocalPlayer.Character
     if myChar then
         local myHum = myChar:FindFirstChildOfClass("Humanoid")
@@ -331,4 +373,3 @@ BtnClose.MouseButton1Click:Connect(function()
     end
     ScreenGui:Destroy()
 end)
-
