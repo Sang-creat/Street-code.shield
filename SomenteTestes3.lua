@@ -11,7 +11,7 @@ getgenv().SelectedTarget = getgenv().SelectedTarget or nil
 getgenv().VoidModeActive = getgenv().VoidModeActive or false
 getgenv().FlingModeActive = getgenv().FlingModeActive or false
 
--- Variáveis específicas do WalkFling (Infinite Yield)
+-- Variáveis originais do WalkFling (Infinite Yield com Persistência)
 local walkFlingEnabled = false
 local heartbeatConnection = nil
 local characterAddedConnection = nil
@@ -25,7 +25,7 @@ if CoreGui:FindFirstChild("TrollHub_PortoLeste") then
 end
 
 --// ====================================================================
---// LÓGICA DO WALKFLING REPLICADA DO INFINITE YIELD (COM PERSISTÊNCIA)
+--// LÓGICA ORIGINAL EXATA DO WALKFLING (INFINITE YIELD)
 --// ====================================================================
 
 local function getRoot(char)
@@ -86,7 +86,7 @@ local function stopWalkFlingLogic()
     end
 end
 
--- Gerenciador de Renascimento (Respawn / Persistência do WalkFling)
+-- Gerenciador de Renascimento (Respawn / Persistência)
 local function monitorCharacter()
     if characterAddedConnection then characterAddedConnection:Disconnect() end
     
@@ -124,7 +124,7 @@ local UICornerToggle = Instance.new("UICorner")
 UICornerToggle.CornerRadius = UDim.new(0, 8)
 UICornerToggle.Parent = ToggleButton
 
--- Janela Principal (Tamanho ligeiramente ajustado para caber os 3 botões confortavelmente)
+-- Janela Principal
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 320, 0, 465)
 MainFrame.Position = UDim2.new(0.5, -160, 0.3, -230)
@@ -232,7 +232,7 @@ Players.PlayerAdded:Connect(UpdatePlayerList)
 Players.PlayerRemoving:Connect(UpdatePlayerList)
 UpdatePlayerList()
 
--- Botões da Interface (Posições recalculadas para encaixar o novo botão)
+-- Botões da Interface
 local BtnVoid = Instance.new("TextButton")
 BtnVoid.Size = UDim2.new(0.9, 0, 0, 40)
 BtnVoid.Position = UDim2.new(0.05, 0, 0, 205)
@@ -255,15 +255,15 @@ BtnFling.Font = Enum.Font.GothamBold
 BtnFling.Parent = MainFrame
 Instance.new("UICorner", BtnFling).CornerRadius = UDim.new(0, 6)
 
--- NOVO BOTÃO: WalkFling (Infinite Yield) integrado independentemente
+-- Botão Independente do WalkFling (Com o visual original do seu script standalone)
 local BtnWalkFling = Instance.new("TextButton")
 BtnWalkFling.Size = UDim2.new(0.9, 0, 0, 40)
 BtnWalkFling.Position = UDim2.new(0.05, 0, 0, 299)
-BtnWalkFling.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+BtnWalkFling.BackgroundColor3 = Color3.fromRGB(180, 50, 50) -- Vermelho (OFF)
 BtnWalkFling.TextColor3 = Color3.fromRGB(255, 255, 255)
-BtnWalkFling.Text = "WalkFling IY [OFF]"
-BtnWalkFling.TextSize = 13
-BtnWalkFling.Font = Enum.Font.GothamBold
+BtnWalkFling.Text = "STATUS: OFF"
+BtnWalkFling.TextSize = 14
+BtnWalkFling.Font = Enum.Font.SourceSansBold
 BtnWalkFling.Parent = MainFrame
 Instance.new("UICorner", BtnWalkFling).CornerRadius = UDim.new(0, 6)
 
@@ -292,7 +292,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
---// Lógica da Função 1 (Void + Auto-Kill com Timeout de 3.7s)
+--// Lógica da Função 1 (Void + Auto-Kill)
 BtnVoid.MouseButton1Click:Connect(function()
     getgenv().VoidModeActive = not getgenv().VoidModeActive
     if getgenv().VoidModeActive then
@@ -346,7 +346,6 @@ task.spawn(function()
                                 successKill = true
                                 break
                             end
-                            -- Timeout ajustado para 3.7 segundos
                             if tick() - startTime > 3.7 then
                                 break
                             end
@@ -407,22 +406,22 @@ RunService.Stepped:Connect(function()
     end
 end)
 
---// Lógica do Botão WalkFling Integrado (Com Persistência)
+--// Lógica Original do Botão WalkFling (Exatamente igual ao primeiro script)
 BtnWalkFling.MouseButton1Click:Connect(function()
     walkFlingEnabled = not walkFlingEnabled
     
     if walkFlingEnabled then
-        BtnWalkFling.Text = "WalkFling IY [ON]"
+        BtnWalkFling.Text = "STATUS: ON"
         BtnWalkFling.BackgroundColor3 = Color3.fromRGB(50, 180, 50) -- Verde
         startWalkFlingLogic()
     else
-        BtnWalkFling.Text = "WalkFling IY [OFF]"
+        BtnWalkFling.Text = "STATUS: OFF"
         BtnWalkFling.BackgroundColor3 = Color3.fromRGB(180, 50, 50) -- Vermelho
         stopWalkFlingLogic()
     end
 end)
 
--- Botão de fechar definitivo (Limpa conexões e destrói a interface)
+-- Botão de fechar definitivo
 BtnClose.MouseButton1Click:Connect(function()
     getgenv().VoidModeActive = false
     getgenv().FlingModeActive = false
