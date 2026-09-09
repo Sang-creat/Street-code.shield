@@ -6,12 +6,11 @@ local UserInputService = game:GetService("UserInputService")
 
 local LocalPlayer = Players.LocalPlayer
 
---// Variáveis de Controle Global e de Estado (WalkFling + Hub)
+--// Variáveis de Controle Global e WalkFling
 getgenv().SelectedTarget = getgenv().SelectedTarget or nil
 getgenv().VoidModeActive = getgenv().VoidModeActive or false
 getgenv().FlingModeActive = getgenv().FlingModeActive or false
 
--- Variáveis específicas do WalkFling (Infinite Yield Otimizado para Pulo)
 local walkFlingEnabled = false
 local heartbeatConnection = nil
 local characterAddedConnection = nil
@@ -24,80 +23,7 @@ if CoreGui:FindFirstChild("TrollHub_PortoLeste") then
     CoreGui.TrollHub_PortoLeste:Destroy()
 end
 
---// ====================================================================
---// LÓGICA DO WALKFLING CORRIGIDA (LIBERANDO O PULO E MOVIMENTO)
---// ====================================================================
-
-local function getRoot(char)
-    return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
-end
-
-local function startWalkFlingLogic()
-    if heartbeatConnection then heartbeatConnection:Disconnect() end
-    
-    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local root = getRoot(character)
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-    
-    if not root then return end
-    
-    local movel = 1
-    heartbeatConnection = RunService.Heartbeat:Connect(function()
-        if not walkFlingEnabled then
-            if heartbeatConnection then heartbeatConnection:Disconnect() end
-            return
-        end
-        
-        if character and character.Parent and root and root.Parent then
-            -- Se o player estiver pulando ou no ar, damos folga no eixo Y para o pulo funcionar
-            local currentVelocity = root.AssemblyLinearVelocity
-            local isJumping = humanoid and (humanoid:GetState() == Enum.HumanoidStateType.Jumping or humanoid:GetState() == Enum.HumanoidStateType.Freefall)
-            
-            if isJumping then
-                -- Mantém a velocidade horizontal para o fling continuar se encostar em alguém, mas deixa o Y livre para pular
-                root.AssemblyLinearVelocity = Vector3.new(currentVelocity.X * 50, currentVelocity.Y, currentVelocity.Z * 50)
-            else
-                -- Lógica normal de fling do IY modificada para não travar o andar
-                root.AssemblyLinearVelocity = Vector3.new(currentVelocity.X * 5000, movel * 5000, currentVelocity.Z * 5000)
-                movel = movel * -1
-            end
-        end
-    end)
-end
-
-local function stopWalkFlingLogic()
-    walkFlingEnabled = false
-    if heartbeatConnection then
-        heartbeatConnection:Disconnect()
-        heartbeatConnection = nil
-    end
-    
-    local character = LocalPlayer.Character
-    if character then
-        local root = getRoot(character)
-        if root then
-            root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-        end
-    end
-end
-
--- Gerenciador de Renascimento (Respawn / Persistência do WalkFling)
-local function monitorCharacter()
-    if characterAddedConnection then characterAddedConnection:Disconnect() end
-    
-    characterAddedConnection = LocalPlayer.CharacterAdded:Connect(function(newCharacter)
-        if walkFlingEnabled then
-            task.wait(0.5)
-            if walkFlingEnabled then
-                startWalkFlingLogic()
-            end
-        end
-    end)
-end
-
-monitorCharacter()
-
---// Construção da Interface Gráfica (GUI) Adaptada para Mobile
+--// Construção da Interface Gráfica (GUI) Unificada
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "TrollHub_PortoLeste"
 ScreenGui.Parent = CoreGui
@@ -118,10 +44,10 @@ local UICornerToggle = Instance.new("UICorner")
 UICornerToggle.CornerRadius = UDim.new(0, 8)
 UICornerToggle.Parent = ToggleButton
 
--- Janela Principal
+-- Janela Principal (Tamanho aumentado para caber o novo botão sem sobreposição)
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 320, 0, 465)
-MainFrame.Position = UDim2.new(0.5, -160, 0.3, -230)
+MainFrame.Size = UDim2.new(0, 320, 0, 475)
+MainFrame.Position = UDim2.new(0.5, -160, 0.3, -237)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 MainFrame.BorderSizePixel = 0
 MainFrame.Visible = true
@@ -226,7 +152,7 @@ Players.PlayerAdded:Connect(UpdatePlayerList)
 Players.PlayerRemoving:Connect(UpdatePlayerList)
 UpdatePlayerList()
 
--- Botões da Interface
+--// Botões das Funcionalidades
 local BtnVoid = Instance.new("TextButton")
 BtnVoid.Size = UDim2.new(0.9, 0, 0, 40)
 BtnVoid.Position = UDim2.new(0.05, 0, 0, 205)
@@ -240,7 +166,7 @@ Instance.new("UICorner", BtnVoid).CornerRadius = UDim.new(0, 6)
 
 local BtnFling = Instance.new("TextButton")
 BtnFling.Size = UDim2.new(0.9, 0, 0, 40)
-BtnFling.Position = UDim2.new(0.05, 0, 0, 252)
+BtnFling.Position = UDim2.new(0.05, 0, 0, 255)
 BtnFling.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
 BtnFling.TextColor3 = Color3.fromRGB(255, 255, 255)
 BtnFling.Text = "Modo Trava + Alvo [OFF]"
@@ -249,12 +175,13 @@ BtnFling.Font = Enum.Font.GothamBold
 BtnFling.Parent = MainFrame
 Instance.new("UICorner", BtnFling).CornerRadius = UDim.new(0, 6)
 
+-- Novo Botão Integrado: WalkFling (Infinite Yield)
 local BtnWalkFling = Instance.new("TextButton")
 BtnWalkFling.Size = UDim2.new(0.9, 0, 0, 40)
-BtnWalkFling.Position = UDim2.new(0.05, 0, 0, 299)
+BtnWalkFling.Position = UDim2.new(0.05, 0, 0, 305)
 BtnWalkFling.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 BtnWalkFling.TextColor3 = Color3.fromRGB(255, 255, 255)
-BtnWalkFling.Text = "WalkFling IY [OFF]"
+BtnWalkFling.Text = "IY WalkFling [OFF]"
 BtnWalkFling.TextSize = 13
 BtnWalkFling.Font = Enum.Font.GothamBold
 BtnWalkFling.Parent = MainFrame
@@ -271,6 +198,86 @@ BtnClose.Font = Enum.Font.Gotham
 BtnClose.Parent = MainFrame
 Instance.new("UICorner", BtnClose).CornerRadius = UDim.new(0, 6)
 
+-- ====================================================================
+-- LÓGICA DO WALKFLING (INFINITE YIELD)
+-- ====================================================================
+local function getRoot(char)
+    return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
+end
+
+local function startWalkFlingLogic()
+    if heartbeatConnection then heartbeatConnection:Disconnect() end
+    
+    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local root = getRoot(character)
+    
+    if not root then return end
+    
+    local movel = 1
+    heartbeatConnection = RunService.Heartbeat:Connect(function()
+        if not walkFlingEnabled then
+            if heartbeatConnection then heartbeatConnection:Disconnect() end
+            return
+        end
+        
+        if character and character.Parent and root and root.Parent then
+            local currentVelocity = root.AssemblyLinearVelocity
+            root.AssemblyLinearVelocity = currentVelocity * 10000 + Vector3.new(0, 10000, 0)
+            RunService.RenderStepped:Wait()
+            
+            if character and character.Parent and root and root.Parent then
+                root.AssemblyLinearVelocity = currentVelocity
+            end
+            
+            RunService.RenderStepped:Wait()
+            if character and character.Parent and root and root.Parent then
+                root.AssemblyLinearVelocity = currentVelocity + Vector3.new(0, movel, 0)
+                movel = movel * -1
+            end
+        end
+    end)
+end
+
+local function stopWalkFlingLogic()
+    walkFlingEnabled = false
+    if heartbeatConnection then
+        heartbeatConnection:Disconnect()
+        heartbeatConnection = nil
+    end
+    
+    local character = LocalPlayer.Character
+    if character then
+        local root = getRoot(character)
+        if root then
+            root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        end
+    end
+end
+
+if characterAddedConnection then characterAddedConnection:Disconnect() end
+characterAddedConnection = LocalPlayer.CharacterAdded:Connect(function(newCharacter)
+    if walkFlingEnabled then
+        task.wait(0.5)
+        if walkFlingEnabled then
+            startWalkFlingLogic()
+        end
+    end
+end)
+
+BtnWalkFling.MouseButton1Click:Connect(function()
+    walkFlingEnabled = not walkFlingEnabled
+    
+    if walkFlingEnabled then
+        BtnWalkFling.Text = "IY WalkFling [ON]"
+        BtnWalkFling.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+        startWalkFlingLogic()
+    else
+        BtnWalkFling.Text = "IY WalkFling [OFF]"
+        BtnWalkFling.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+        stopWalkFlingLogic()
+    end
+end)
+
 --// Sistema de Anti-Void Base
 RunService.Heartbeat:Connect(function()
     if getgenv().VoidModeActive or getgenv().FlingModeActive then
@@ -285,7 +292,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
---// Lógica da Função 1 (Void + Auto-Kill)
+--// Lógica da Função 1 (Void + Auto-Kill com Timeout de 3.7s)
 BtnVoid.MouseButton1Click:Connect(function()
     getgenv().VoidModeActive = not getgenv().VoidModeActive
     if getgenv().VoidModeActive then
@@ -399,29 +406,12 @@ RunService.Stepped:Connect(function()
     end
 end)
 
---// Botão WalkFling Otimizado
-BtnWalkFling.MouseButton1Click:Connect(function()
-    walkFlingEnabled = not walkFlingEnabled
-    
-    if walkFlingEnabled then
-        BtnWalkFling.Text = "WalkFling IY [ON]"
-        BtnWalkFling.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-        startWalkFlingLogic()
-    else
-        BtnWalkFling.Text = "WalkFling IY [OFF]"
-        BtnWalkFling.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-        stopWalkFlingLogic()
-    end
-end)
-
 -- Botão de fechar definitivo
 BtnClose.MouseButton1Click:Connect(function()
     getgenv().VoidModeActive = false
     getgenv().FlingModeActive = false
     stopWalkFlingLogic()
-    if characterAddedConnection then
-        characterAddedConnection:Disconnect()
-    end
+    if characterAddedConnection then characterAddedConnection:Disconnect() end
     
     local myChar = LocalPlayer.Character
     if myChar then
