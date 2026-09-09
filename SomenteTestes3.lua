@@ -10,10 +10,91 @@ local LocalPlayer = Players.LocalPlayer
 getgenv().SelectedTarget = getgenv().SelectedTarget or nil
 getgenv().VoidModeActive = getgenv().VoidModeActive or false
 getgenv().FlingModeActive = getgenv().FlingModeActive or false
+
+-- Variáveis de Controle de Estado do WalkFling (Integrado com a variável global)
 getgenv().WalkFlingActive = getgenv().WalkFlingActive or false
+local heartbeatConnection = nil
+local characterAddedConnection = nil
 
 local VOID_POSITION = Vector3.new(0, -450, 0)
 local lastTargetPosition = CFrame.new(0, 5, 0)
+
+-- ====================================================================
+-- LÓGICA DO WALKFLING REPLICADA DO INFINITE YIELD (COM PERSISTÊNCIA)
+-- ====================================================================
+
+local function getRoot(char)
+    return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
+end
+
+local function startWalkFlingLogic()
+    -- Desconecta loops anteriores para evitar sobreposição
+    if heartbeatConnection then heartbeatConnection:Disconnect() end
+    
+    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local root = getRoot(character)
+    
+    if not root then return end
+    
+    local movel = 1
+    heartbeatConnection = RunService.Heartbeat:Connect(function()
+        if not getgenv().WalkFlingActive then
+            if heartbeatConnection then heartbeatConnection:Disconnect() end
+            return
+        end
+        
+        -- Garante que o character e a RootPart ainda são válidos no frame atual
+        if character and character.Parent and root and root.Parent then
+            local currentVelocity = root.AssemblyLinearVelocity
+            
+            -- Multiplicação física idêntica ao IY para quebrar o cálculo de colisão do Roblox
+            root.AssemblyLinearVelocity = currentVelocity * 10000 + Vector3.new(0, 10000, 0)
+            RunService.RenderStepped:Wait()
+            
+            if character and character.Parent and root and root.Parent then
+                root.AssemblyLinearVelocity = currentVelocity
+            end
+            
+            RunService.RenderStepped:Wait()
+            if character and character.Parent and root and root.Parent then
+                root.AssemblyLinearVelocity = currentVelocity + Vector3.new(0, movel, 0)
+                movel = movel * -1
+            end
+        end
+    end)
+end
+
+local function stopWalkFlingLogic()
+    getgenv().WalkFlingActive = false
+    if heartbeatConnection then
+        heartbeatConnection:Disconnect()
+        heartbeatConnection = nil
+    end
+    
+    -- Reseta a velocidade para evitar travamentos residuais
+    local character = LocalPlayer.Character
+    if character then
+        local root = getRoot(character)
+        if root then
+            root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        end
+    end
+end
+
+-- Gerenciador de Renascimento (Respawn / Persistência)
+local function monitorCharacter()
+    if characterAddedConnection then characterAddedConnection:Disconnect() end
+    
+    characterAddedConnection = LocalPlayer.CharacterAdded:Connect(function(newCharacter)
+        if getgenv().WalkFlingActive then
+            -- Pequeno delay para garantir que o motor físico carregou a RootPart após o spawn
+            task.wait(0.5)
+            if getgenv().WalkFlingActive then
+                startWalkFlingLogic()
+            end
+        end
+    end)
+end
 
 -- Limpeza de interface anterior
 if CoreGui:FindFirstChild("TrollHub_PortoLeste") then
@@ -172,7 +253,7 @@ BtnFling.Font = Enum.Font.GothamBold
 BtnFling.Parent = MainFrame
 Instance.new("UICorner", BtnFling).CornerRadius = UDim.new(0, 6)
 
--- Botão Exclusivo do WalkFling Real do Infinite Yield
+-- Botão Exclusivo do WalkFling Real Integrado
 local BtnWalkFling = Instance.new("TextButton")
 BtnWalkFling.Size = UDim2.new(0.9, 0, 0, 40)
 BtnWalkFling.Position = UDim2.new(0.05, 0, 0, 305)
@@ -315,38 +396,30 @@ RunService.Stepped:Connect(function()
     end
 end)
 
---// Lógica Exata do WalkFling Original do Infinite Yield (Livre por colisão)
+--// Lógica Oficial e Funcional do WalkFling Integrada ao Botão do Hub
 BtnWalkFling.MouseButton1Click:Connect(function()
     getgenv().WalkFlingActive = not getgenv().WalkFlingActive
+    
     if getgenv().WalkFlingActive then
-        BtnWalkFling.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
         BtnWalkFling.Text = "WalkFling (Infinite Yield) [ON]"
+        BtnWalkFling.BackgroundColor3 = Color3.fromRGB(40, 180, 40) -- Verde
+        startWalkFlingLogic()
     else
-        BtnWalkFling.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
         BtnWalkFling.Text = "WalkFling (Infinite Yield) [OFF]"
+        BtnWalkFling.BackgroundColor3 = Color3.fromRGB(180, 40, 40) -- Vermelho
+        stopWalkFlingLogic()
     end
 end)
 
--- Código fonte extraído fielmente do Infinite Yield para o WalkFling (Funciona andando e colidindo)
-RunService.Stepped:Connect(function()
-    if getgenv().WalkFlingActive then
-        local character = LocalPlayer.Character
-        if character then
-            local hrp = character:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                -- Lógica original do IY: velocidade rotacional e linear alta sem congelar o player
-                hrp.AssemblyAngularVelocity = Vector3.new(0, 99999, 0)
-                hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-            end
-        end
-    end
-end)
+-- Iniciar monitoramento de persistência de spawn para o WalkFling
+monitorCharacter()
 
 -- Botão de fechar definitivo
 BtnClose.MouseButton1Click:Connect(function()
     getgenv().VoidModeActive = false
     getgenv().FlingModeActive = false
-    getgenv().WalkFlingActive = false
+    stopWalkFlingLogic()
+    
     local myChar = LocalPlayer.Character
     if myChar then
         local myHum = myChar:FindFirstChildOfClass("Humanoid")
