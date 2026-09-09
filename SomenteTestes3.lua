@@ -6,24 +6,20 @@ local UserInputService = game:GetService("UserInputService")
 
 local LocalPlayer = Players.LocalPlayer
 
---// Variáveis de Controle Global e WalkFling
+--// Variáveis de Controle Global
 getgenv().SelectedTarget = getgenv().SelectedTarget or nil
 getgenv().VoidModeActive = getgenv().VoidModeActive or false
 getgenv().FlingModeActive = getgenv().FlingModeActive or false
 
-local walkFlingEnabled = false
-local heartbeatConnection = nil
-local characterAddedConnection = nil
-
 local VOID_POSITION = Vector3.new(0, -450, 0)
-local lastTargetPosition = CFrame.new(0, 5, 0)
+local lastTargetPosition = CFrame.new(0, 5, 0) -- Armazena a última posição segura para retorno
 
 -- Limpeza de interface anterior
 if CoreGui:FindFirstChild("TrollHub_PortoLeste") then
     CoreGui.TrollHub_PortoLeste:Destroy()
 end
 
---// Construção da Interface Gráfica (GUI) Unificada
+--// Construção da Interface Gráfica (GUI) Adaptada para Mobile
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "TrollHub_PortoLeste"
 ScreenGui.Parent = CoreGui
@@ -44,10 +40,10 @@ local UICornerToggle = Instance.new("UICorner")
 UICornerToggle.CornerRadius = UDim.new(0, 8)
 UICornerToggle.Parent = ToggleButton
 
--- Janela Principal (Tamanho aumentado para caber o novo botão sem sobreposição)
+-- Janela Principal (Tamanho ajustado para caber o novo botão)
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 320, 0, 475)
-MainFrame.Position = UDim2.new(0.5, -160, 0.3, -237)
+MainFrame.Size = UDim2.new(0, 320, 0, 470)
+MainFrame.Position = UDim2.new(0.5, -160, 0.3, -235)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 MainFrame.BorderSizePixel = 0
 MainFrame.Visible = true
@@ -107,8 +103,8 @@ Title.Parent = MainFrame
 
 -- Lista de Alvos
 local TargetScroll = Instance.new("ScrollingFrame")
-TargetScroll.Size = UDim2.new(0.9, 0, 0, 150)
-TargetScroll.Position = UDim2.new(0.05, 0, 0, 45)
+TargetScroll.Size = UDim2.new(0.9, 0, 0, 160)
+TargetScroll.Position = UDim2.new(0.05, 0, 0, 50)
 TargetScroll.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 TargetScroll.BorderSizePixel = 0
 TargetScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -152,10 +148,10 @@ Players.PlayerAdded:Connect(UpdatePlayerList)
 Players.PlayerRemoving:Connect(UpdatePlayerList)
 UpdatePlayerList()
 
---// Botões das Funcionalidades
+-- Botões da Interface
 local BtnVoid = Instance.new("TextButton")
 BtnVoid.Size = UDim2.new(0.9, 0, 0, 40)
-BtnVoid.Position = UDim2.new(0.05, 0, 0, 205)
+BtnVoid.Position = UDim2.new(0.05, 0, 0, 220)
 BtnVoid.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
 BtnVoid.TextColor3 = Color3.fromRGB(255, 255, 255)
 BtnVoid.Text = "Modo Void + Auto-Kill [OFF]"
@@ -166,7 +162,7 @@ Instance.new("UICorner", BtnVoid).CornerRadius = UDim.new(0, 6)
 
 local BtnFling = Instance.new("TextButton")
 BtnFling.Size = UDim2.new(0.9, 0, 0, 40)
-BtnFling.Position = UDim2.new(0.05, 0, 0, 255)
+BtnFling.Position = UDim2.new(0.05, 0, 0, 265)
 BtnFling.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
 BtnFling.TextColor3 = Color3.fromRGB(255, 255, 255)
 BtnFling.Text = "Modo Trava + Alvo [OFF]"
@@ -175,13 +171,13 @@ BtnFling.Font = Enum.Font.GothamBold
 BtnFling.Parent = MainFrame
 Instance.new("UICorner", BtnFling).CornerRadius = UDim.new(0, 6)
 
--- Novo Botão Integrado: WalkFling (Infinite Yield)
+-- Novo Botão WalkFling Integrado
 local BtnWalkFling = Instance.new("TextButton")
 BtnWalkFling.Size = UDim2.new(0.9, 0, 0, 40)
-BtnWalkFling.Position = UDim2.new(0.05, 0, 0, 305)
+BtnWalkFling.Position = UDim2.new(0.05, 0, 0, 310)
 BtnWalkFling.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 BtnWalkFling.TextColor3 = Color3.fromRGB(255, 255, 255)
-BtnWalkFling.Text = "IY WalkFling [OFF]"
+BtnWalkFling.Text = "WalkFling [OFF]"
 BtnWalkFling.TextSize = 13
 BtnWalkFling.Font = Enum.Font.GothamBold
 BtnWalkFling.Parent = MainFrame
@@ -189,7 +185,7 @@ Instance.new("UICorner", BtnWalkFling).CornerRadius = UDim.new(0, 6)
 
 local BtnClose = Instance.new("TextButton")
 BtnClose.Size = UDim2.new(0.9, 0, 0, 35)
-BtnClose.Position = UDim2.new(0.05, 0, 0, 355)
+BtnClose.Position = UDim2.new(0.05, 0, 0, 375)
 BtnClose.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 BtnClose.TextColor3 = Color3.fromRGB(255, 255, 255)
 BtnClose.Text = "Desativar e Fechar Script"
@@ -197,86 +193,6 @@ BtnClose.TextSize = 12
 BtnClose.Font = Enum.Font.Gotham
 BtnClose.Parent = MainFrame
 Instance.new("UICorner", BtnClose).CornerRadius = UDim.new(0, 6)
-
--- ====================================================================
--- LÓGICA DO WALKFLING (INFINITE YIELD)
--- ====================================================================
-local function getRoot(char)
-    return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
-end
-
-local function startWalkFlingLogic()
-    if heartbeatConnection then heartbeatConnection:Disconnect() end
-    
-    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local root = getRoot(character)
-    
-    if not root then return end
-    
-    local movel = 1
-    heartbeatConnection = RunService.Heartbeat:Connect(function()
-        if not walkFlingEnabled then
-            if heartbeatConnection then heartbeatConnection:Disconnect() end
-            return
-        end
-        
-        if character and character.Parent and root and root.Parent then
-            local currentVelocity = root.AssemblyLinearVelocity
-            root.AssemblyLinearVelocity = currentVelocity * 10000 + Vector3.new(0, 10000, 0)
-            RunService.RenderStepped:Wait()
-            
-            if character and character.Parent and root and root.Parent then
-                root.AssemblyLinearVelocity = currentVelocity
-            end
-            
-            RunService.RenderStepped:Wait()
-            if character and character.Parent and root and root.Parent then
-                root.AssemblyLinearVelocity = currentVelocity + Vector3.new(0, movel, 0)
-                movel = movel * -1
-            end
-        end
-    end)
-end
-
-local function stopWalkFlingLogic()
-    walkFlingEnabled = false
-    if heartbeatConnection then
-        heartbeatConnection:Disconnect()
-        heartbeatConnection = nil
-    end
-    
-    local character = LocalPlayer.Character
-    if character then
-        local root = getRoot(character)
-        if root then
-            root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-        end
-    end
-end
-
-if characterAddedConnection then characterAddedConnection:Disconnect() end
-characterAddedConnection = LocalPlayer.CharacterAdded:Connect(function(newCharacter)
-    if walkFlingEnabled then
-        task.wait(0.5)
-        if walkFlingEnabled then
-            startWalkFlingLogic()
-        end
-    end
-end)
-
-BtnWalkFling.MouseButton1Click:Connect(function()
-    walkFlingEnabled = not walkFlingEnabled
-    
-    if walkFlingEnabled then
-        BtnWalkFling.Text = "IY WalkFling [ON]"
-        BtnWalkFling.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-        startWalkFlingLogic()
-    else
-        BtnWalkFling.Text = "IY WalkFling [OFF]"
-        BtnWalkFling.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-        stopWalkFlingLogic()
-    end
-end)
 
 --// Sistema de Anti-Void Base
 RunService.Heartbeat:Connect(function()
@@ -346,6 +262,7 @@ task.spawn(function()
                                 successKill = true
                                 break
                             end
+                            -- Timeout ajustado para 3.7 segundos
                             if tick() - startTime > 3.7 then
                                 break
                             end
@@ -406,13 +323,99 @@ RunService.Stepped:Connect(function()
     end
 end)
 
+--// Lógica da Função 3 (WalkFling Integrado)
+local walkFlingEnabled = false
+local heartbeatConnection = nil
+local characterAddedConnection = nil
+
+local function getRoot(char)
+    return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
+end
+
+local function startWalkFlingLogic()
+    if heartbeatConnection then heartbeatConnection:Disconnect() end
+    
+    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local root = getRoot(character)
+    
+    if not root then return end
+    
+    local movel = 1
+    heartbeatConnection = RunService.Heartbeat:Connect(function()
+        if not walkFlingEnabled then
+            if heartbeatConnection then heartbeatConnection:Disconnect() end
+            return
+        end
+        
+        if character and character.Parent and root and root.Parent then
+            local currentVelocity = root.AssemblyLinearVelocity
+            
+            root.AssemblyLinearVelocity = currentVelocity * 10000 + Vector3.new(0, 10000, 0)
+            RunService.RenderStepped:Wait()
+            
+            if character and character.Parent and root and root.Parent then
+                root.AssemblyLinearVelocity = currentVelocity
+            end
+            
+            RunService.RenderStepped:Wait()
+            if character and character.Parent and root and root.Parent then
+                root.AssemblyLinearVelocity = currentVelocity + Vector3.new(0, movel, 0)
+                movel = movel * -1
+            end
+        end
+    end)
+end
+
+local function stopWalkFlingLogic()
+    walkFlingEnabled = false
+    if heartbeatConnection then
+        heartbeatConnection:Disconnect()
+        heartbeatConnection = nil
+    end
+    
+    local character = LocalPlayer.Character
+    if character then
+        local root = getRoot(character)
+        if root then
+            root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        end
+    end
+end
+
+local function monitorCharacter()
+    if characterAddedConnection then characterAddedConnection:Disconnect() end
+    
+    characterAddedConnection = LocalPlayer.CharacterAdded:Connect(function(newCharacter)
+        if walkFlingEnabled then
+            task.wait(0.5)
+            if walkFlingEnabled then
+                startWalkFlingLogic()
+            end
+        end
+    end)
+end
+
+BtnWalkFling.MouseButton1Click:Connect(function()
+    walkFlingEnabled = not walkFlingEnabled
+    
+    if walkFlingEnabled then
+        BtnWalkFling.Text = "WalkFling [ON]"
+        BtnWalkFling.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+        startWalkFlingLogic()
+    else
+        BtnWalkFling.Text = "WalkFling [OFF]"
+        BtnWalkFling.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+        stopWalkFlingLogic()
+    end
+end)
+
+monitorCharacter()
+
 -- Botão de fechar definitivo
 BtnClose.MouseButton1Click:Connect(function()
     getgenv().VoidModeActive = false
     getgenv().FlingModeActive = false
     stopWalkFlingLogic()
-    if characterAddedConnection then characterAddedConnection:Disconnect() end
-    
     local myChar = LocalPlayer.Character
     if myChar then
         local myHum = myChar:FindFirstChildOfClass("Humanoid")
