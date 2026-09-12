@@ -1,184 +1,147 @@
 local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
-local LocalPlayer = Players.LocalPlayer
 
--- Estado da função (Começa desligada)
-local hitboxEspAtivo = false
-local conexoesRastreio = {}
+-- Estado do ESP (Começa desligado ou ligado, você decide)
+local espEnabled = true
 
--- Função para limpar os ESPs criados
-local function limparTudo()
-    for _, conn in pairs(conexoesRastreio) do
-        if typeof(conn) == "RBXScriptConnection" then
-            conn:Disconnect()
-        end
-    end
-    conexoesRastreio = {}
-
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p.Character then
-            local box = p.Character:FindFirstChild("TrollHubBox")
-            local gui = p.Character:FindFirstChild("TrollHubInfo")
-            if box then box:Destroy() end
-            if gui then gui:Destroy() end
-        end
-    end
-end
-
--- Função principal do Hitbox ESP
-local function iniciarHitboxESP()
-    if not hitboxEspAtivo then return end
-
-    local function rastrearJogador(player)
-        if player == LocalPlayer then return end
-
-        local conexao
-        conexao = RunService.RenderStepped:Connect(function()
-            if not hitboxEspAtivo then
-                conexao:Disconnect()
-                return
-            end
-
-            local character = player.Character
-            if not character or not character:FindFirstChild("HumanoidRootPart") then 
-                return 
-            end
-
-            local rootPart = character.HumanoidRootPart
-            local tool = character:FindFirstChildOfClass("Tool")
-            local handle = tool and tool:FindFirstChild("Handle")
-
-            if handle then
-                -- 1. Cria ou atualiza a Caixa Visual (SelectionBox)
-                local selectionBox = character:FindFirstChild("TrollHubBox")
-                if not selectionBox then
-                    selectionBox = Instance.new("SelectionBox")
-                    selectionBox.Name = "TrollHubBox"
-                    selectionBox.Adornee = handle
-                    selectionBox.Color3 = Color3.fromRGB(255, 0, 0) -- Vermelho de alerta
-                    selectionBox.LineThickness = 0.08
-                    selectionBox.Parent = character
-                else
-                    selectionBox.Adornee = handle -- Garante que acompanha caso mude de mão
-                end
-
-                -- 2. Cria ou atualiza o Texto Flutuante (BillboardGui)
-                local billboard = character:FindFirstChild("TrollHubInfo")
-                local textLabel
-                if not billboard then
-                    billboard = Instance.new("BillboardGui")
-                    billboard.Name = "TrollHubInfo"
-                    billboard.Size = UDim2.new(0, 220, 0, 60)
-                    billboard.StudsOffset = Vector3.new(0, 3, 0)
-                    billboard.AlwaysOnTop = true
-                    billboard.Parent = character
-
-                    textLabel = Instance.new("TextLabel")
-                    textLabel.Name = "InfoText"
-                    textLabel.Size = UDim2.new(1, 0, 1, 0)
-                    textLabel.BackgroundTransparency = 1
-                    textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-                    textLabel.TextStrokeTransparency = 0 -- Borda preta para legibilidade
-                    textLabel.TextSize = 13
-                    textLabel.Font = Enum.Font.SourceSansBold
-                    textLabel.Parent = billboard
-                else
-                    textLabel = billboard:FindFirstChild("InfoText")
-                end
-
-                -- 3. Calcula Distância e Tamanho com segurança
-                if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                    local dist = (LocalPlayer.Character.HumanoidRootPart.Position - rootPart.Position).Magnitude
-                    local size = handle.Size
-                    
-                    if textLabel then
-                        -- Corrigido de string.Format para string.format (minúsculo)
-                        textLabel.Text = string.format("[%s]\nDist: %d Studs\nTamanho: %.1f, %.1f, %.1f", 
-                            player.Name, math.floor(dist), size.X, size.Y, size.Z)
-                    end
-                end
-            else
-                -- Remove a caixa e o texto se o jogador NÃO estiver com ferramenta equipada
-                local box = character:FindFirstChild("TrollHubBox")
-                local gui = character:FindFirstChild("TrollHubInfo")
-                if box then box:Destroy() end
-                if gui then gui:Destroy() end
-            end
-        end)
-
-        table.insert(conexoesRastreio, conexao)
-    end
-
-    -- Aplica nos jogadores atuais
-    for _, p in ipairs(Players:GetPlayers()) do
-        rastrearJogador(p)
-    end
-
-    -- Monitora entrada de novos jogadores
-    local playerAddedConn = Players.PlayerAdded:Connect(function(p)
-        p.CharacterAdded:Connect(function()
-            if hitboxEspAtivo then
-                task.wait(1)
-                rastrearJogador(p)
-            end
-        end)
-    end)
-    table.insert(conexoesRastreio, playerAddedConn)
-
-    -- Monitora o respawn dos jogadores atuais
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then
-            table.insert(conexoesRastreio, p.CharacterAdded:Connect(function()
-                if hitboxEspAtivo then
-                    task.wait(1)
-                    rastrearJogador(p)
-                end
-            end))
-        end
-    end
-end
-
--- ==========================================
--- INTERFACE DO BOTÃO (TROLLHUB)
--- ==========================================
+-- Criar a Interface Gráfica (Botão Liga/Desliga)
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "TrollHubUI"
-ScreenGui.Parent = CoreGui
+ScreenGui.Name = "ReachESP_UI"
+ScreenGui.ResetOnSpawn = false
+-- Tenta injetar no CoreGui para ficar protegido, se falhar vai para PlayerGui
+pcall(function() ScreenGui.Parent = CoreGui end)
+if not ScreenGui.Parent then
+    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+end
 
 local ToggleButton = Instance.new("TextButton")
-ToggleButton.Name = "HitboxESP_Button"
+ToggleButton.Name = "ToggleButton"
 ToggleButton.Size = UDim2.new(0, 160, 0, 45)
-ToggleButton.Position = UDim2.new(0, 50, 0, 50)
-ToggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+ToggleButton.Position = UDim2.new(0, 20, 0, 100)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleButton.TextSize = 14
-ToggleButton.Font = Enum.Font.GothamBold
-ToggleButton.Text = "Hitbox ESP: [OFF]"
+ToggleButton.TextScaled = true
+ToggleButton.Font = Enum.Font.SourceSansBold
+ToggleButton.Text = "ESP Reach: [ON]"
 ToggleButton.Parent = ScreenGui
 
-ToggleButton.Active = true
-ToggleButton.Draggable = true
-
--- Ação do Botão
+-- Função do Botão
 ToggleButton.MouseButton1Click:Connect(function()
-    hitboxEspAtivo = not hitboxEspAtivo
-
-    if hitboxEspAtivo then
-        ToggleButton.Text = "Hitbox ESP: [ON]"
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-        iniciarHitboxESP()
+    espEnabled = not espEnabled
+    if espEnabled then
+        ToggleButton.Text = "ESP Reach: [ON]"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     else
-        ToggleButton.Text = "Hitbox ESP: [OFF]"
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-        limparTudo()
+        ToggleButton.Text = "ESP Reach: [OFF]"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        
+        -- Limpa tudo ao desligar
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player.Character then
+                local tool = player.Character:FindFirstChildOfClass("Tool")
+                if tool then
+                    local handle = tool:FindFirstChild("Handle")
+                    if handle then
+                        if handle:FindFirstChild("ExpandedReachBox") then handle.ExpandedReachBox:Destroy() end
+                        if handle:FindFirstChild("ReachInfoTag") then handle.ReachInfoTag:Destroy() end
+                    end
+                end
+            end
+        end
     end
 end)
 
--- Persistência caso você (dono do script) morra e renasça
-LocalPlayer.CharacterAdded:Connect(function()
-    if hitboxEspAtivo then
-        task.wait(1)
-        iniciarHitboxESP()
+-- Função principal do ESP
+local function updateExpandedReachESP(player)
+    if player == LocalPlayer or not player.Character then return end
+    
+    local character = player.Character
+    local tool = character:FindFirstChildOfClass("Tool")
+    
+    if espEnabled and tool then
+        local handle = tool:FindFirstChild("Handle")
+        if handle then
+            -- 1. Gerenciar a Caixa Tridimensional Real
+            local boxVisual = handle:FindFirstChild("ExpandedReachBox")
+            if not boxVisual then
+                boxVisual = Instance.new("BoxHandleAdornee")
+                boxVisual.Name = "ExpandedReachBox"
+                boxVisual.Adornee = handle
+                boxVisual.AlwaysOnTop = true
+                boxVisual.Color3 = Color3.fromRGB(255, 40, 40)
+                boxVisual.Transparency = 0.65
+                boxVisual.ZIndex = 10
+                boxVisual.Parent = handle
+            end
+            -- Aplica as dimensões reais da hitbox modificada pelo reach
+            boxVisual.Size = handle.Size
+            boxVisual.CFrame = handle.CFrame
+
+            -- 2. Gerenciar o Texto Informativo (Distância, Dono e Tamanho)
+            local infoTag = handle:FindFirstChild("ReachInfoTag")
+            local textLabel
+            
+            if not infoTag then
+                infoTag = Instance.new("BillboardGui")
+                infoTag.Name = "ReachInfoTag"
+                infoTag.Adornee = handle
+                infoTag.Size = UDim2.new(0, 200, 0, 60)
+                infoTag.StudsOffset = Vector3.new(0, 3, 0) -- Flutua um pouco acima da caixa
+                infoTag.AlwaysOnTop = true
+                
+                textLabel = Instance.new("TextLabel")
+                textLabel.Name = "Text"
+                textLabel.Size = UDim2.new(1, 0, 1, 0)
+                textLabel.BackgroundTransparency = 1
+                textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+                textLabel.TextStrokeTransparency = 0 -- Borda preta no texto para leitura clara
+                textLabel.TextScaled = true
+                textLabel.Font = Enum.Font.SourceSansBold
+                textLabel.Parent = infoTag
+                
+                infoTag.Parent = handle
+            else
+                textLabel = infoTag:FindFirstChild("Text")
+            end
+
+            -- Calcula a distância entre você e a espada do inimigo
+            local distance = 0
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                distance = math.floor((LocalPlayer.Character.HumanoidRootPart.Position - handle.Position).Magnitude)
+            end
+
+            -- Formata o tamanho para números inteiros bonitos
+            local sizeX = math.floor(handle.Size.X + 0.5)
+            local sizeY = math.floor(handle.Size.Y + 0.5)
+            local sizeZ = math.floor(handle.Size.Z + 0.5)
+
+            -- Atualiza o texto em tempo real
+            if textLabel then
+                textLabel.Text = string.format("👤 %s\n📏 Dist: %d Studs\n📦 Tam: [%d, %d, %d]", 
+                    player.Name, distance, sizeX, sizeY, sizeZ)
+            end
+        end
+    else
+        -- Se desativado ou sem ferramenta, limpa os elementos daquele player
+        local tool = character:FindFirstChildOfClass("Tool")
+        if tool then
+            local handle = tool:FindFirstChild("Handle")
+            if handle then
+                if handle:FindFirstChild("ExpandedReachBox") then handle.ExpandedReachBox:Destroy() end
+                if handle:FindFirstChild("ReachInfoTag") then handle.ReachInfoTag:Destroy() end
+            end
+        end
+    end
+end
+
+-- Loop de execução contínua
+RunService.RenderStepped:Connect(function()
+    if not espEnabled then return end
+    for _, player in ipairs(Players:GetPlayers()) do
+        pcall(function()
+            updateExpandedReachESP(player)
+        end)
     end
 end)
