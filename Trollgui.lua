@@ -1,5 +1,5 @@
 -- ==========================================
--- SCRIPT: TROLL HUB MOBILE - MASTER (7 ABAS INTEGRADAS)
+-- SCRIPT: TROLL HUB MOBILE - MASTER (8 ABAS INTEGRADAS)
 -- ==========================================
 
 local Players = game:GetService("Players")
@@ -9,6 +9,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 local Lighting = game:GetService("Lighting")
+local UserInputService = game:GetService("UserInputService")
 
 local LocalPlayer = Players.LocalPlayer
 
@@ -26,6 +27,14 @@ local activeLoopTarget = nil
 local loopTask = nil
 local isTeleporting = false
 local selectedTargetPlayer = nil
+
+-- Variáveis de Controle Global (Nova 8ª Aba - Void, Fling e WalkFling)
+getgenv().SelectedTarget = getgenv().SelectedTarget or nil
+getgenv().VoidModeActive = getgenv().VoidModeActive or false
+getgenv().FlingModeActive = getgenv().FlingModeActive or false
+
+local VOID_POSITION = Vector3.new(0, -450, 0)
+local lastTargetPosition = CFrame.new(0, 5, 0)
 
 -- Variáveis do Sistema de Combate / Reach
 local reachValue = 5
@@ -168,6 +177,8 @@ CloseScriptBtn.MouseButton1Click:Connect(function()
     flyActive = false
     antiLagActive = false
     espActive = false
+    getgenv().VoidModeActive = false
+    getgenv().FlingModeActive = false
 
     if reachConnection then reachConnection:Disconnect() end
     if boxReachConnection then boxReachConnection:Disconnect() end
@@ -184,6 +195,12 @@ CloseScriptBtn.MouseButton1Click:Connect(function()
     for _, g in ipairs(GearGroups) do g.Active = false end
     for _, ig in ipairs(IndividualGears) do ig.Active = false end
 
+    local myChar = LocalPlayer.Character
+    if myChar then
+        local myHum = myChar:FindFirstChildOfClass("Humanoid")
+        if myHum then myHum.PlatformStand = false end
+    end
+
     ScreenGui:Destroy()
 end)
 
@@ -191,7 +208,7 @@ ToggleGuiBtn.MouseButton1Click:Connect(function()
     MainFrame.Visible = not MainFrame.Visible
 end)
 
--- Sistema de Abas
+-- Sistema de Abas (Atualizado para acomodar 8 abas compactas)
 local TabBar = Instance.new("Frame", MainFrame)
 TabBar.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
 TabBar.Position = UDim2.new(0, 0, 0, 40)
@@ -230,6 +247,7 @@ local PageCombat, CombatLayout = createPage()
 local PageExtra, ExtraLayout = createPage()
 local PageProt, ProtLayout = createPage()
 local PageIndiv, IndivLayout = createPage()
+local PageFlingVoid, FlingVoidLayout = createPage() -- Nova 8ª Aba
 PageAlvo.Visible = true
 
 local function switchPage(targetPage)
@@ -240,17 +258,18 @@ local function switchPage(targetPage)
     PageExtra.Visible = false
     PageProt.Visible = false
     PageIndiv.Visible = false
+    PageFlingVoid.Visible = false
     targetPage.Visible = true
 end
 
 local function createTabButton(name, targetPage)
     local btn = Instance.new("TextButton", TabBar)
     btn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-    btn.Size = UDim2.new(0.138, 0, 0.8, 0)
+    btn.Size = UDim2.new(0.12, 0, 0.8, 0) -- Ajustado para 8 abas caberem perfeitamente
     btn.Font = Enum.Font.SourceSansBold
     btn.Text = name
     btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.TextSize = 9
+    btn.TextSize = 8
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
     
     btn.MouseButton1Click:Connect(function()
@@ -265,6 +284,7 @@ createTabButton("4.Comb", PageCombat)
 createTabButton("5.Extra", PageExtra)
 createTabButton("6.Prot", PageProt)
 createTabButton("7.Indiv", PageIndiv)
+createTabButton("8.Void", PageFlingVoid)
 
 -- ================= PAGE 1: SELEÇÃO DE ALVO =================
 local function createSectionTitle(parent, text)
@@ -322,6 +342,7 @@ local function refreshPlayerList()
             pBtn.MouseButton1Click:Connect(function()
                 selectedTargetPlayer = plr
                 activeLoopTarget = plr
+                getgenv().SelectedTarget = plr -- Sincronizado com a 8ª Aba
                 TargetDisplay.Text = "Alvo: " .. plr.Name .. " [" .. plr.UserId .. "]"
             end)
         end
@@ -1610,10 +1631,270 @@ for _, ig in ipairs(IndividualGears) do
     toggleKey.MouseButton1Click:Connect(toggleGearState)
 end
 
+-- ================= PAGE 8: VOID, FLING & WALKING FLING =================
+createSectionTitle(PageFlingVoid, "Funções Táticas Especiais (Void & Fling):")
+
+local BtnVoid = Instance.new("TextButton", PageFlingVoid)
+BtnVoid.Size = UDim2.new(0.9, 0, 0, 40)
+BtnVoid.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+BtnVoid.TextColor3 = Color3.fromRGB(255, 255, 255)
+BtnVoid.Text = "Modo Void + Auto-Kill [OFF]"
+BtnVoid.TextSize = 13
+BtnVoid.Font = Enum.Font.SourceSansBold
+Instance.new("UICorner", BtnVoid).CornerRadius = UDim.new(0, 6)
+BtnVoid.Parent = PageFlingVoid
+
+local BtnFling = Instance.new("TextButton", PageFlingVoid)
+BtnFling.Size = UDim2.new(0.9, 0, 0, 40)
+BtnFling.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+BtnFling.TextColor3 = Color3.fromRGB(255, 255, 255)
+BtnFling.Text = "Modo Trava + Alvo [OFF]"
+BtnFling.TextSize = 13
+BtnFling.Font = Enum.Font.SourceSansBold
+Instance.new("UICorner", BtnFling).CornerRadius = UDim.new(0, 6)
+BtnFling.Parent = PageFlingVoid
+
+local BtnWalkFling = Instance.new("TextButton", PageFlingVoid)
+BtnWalkFling.Size = UDim2.new(0.9, 0, 0, 40)
+BtnWalkFling.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+BtnWalkFling.TextColor3 = Color3.fromRGB(255, 255, 255)
+BtnWalkFling.Text = "WalkFling [OFF]"
+BtnWalkFling.TextSize = 13
+BtnWalkFling.Font = Enum.Font.SourceSansBold
+Instance.new("UICorner", BtnWalkFling).CornerRadius = UDim.new(0, 6)
+BtnWalkFling.Parent = PageFlingVoid
+
+--// Sistema Anti-Void Base integrado
+RunService.Heartbeat:Connect(function()
+    if getgenv().VoidModeActive or getgenv().FlingModeActive then
+        local char = LocalPlayer.Character
+        if char then
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if hrp and hrp.Position.Y < -300 then
+                hrp.CFrame = CFrame.new(VOID_POSITION)
+                hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+            end
+        end
+    end
+end)
+
+--// Lógica da Função 1 (Void + Auto-Kill com Timeout de 3.7s)
+BtnVoid.MouseButton1Click:Connect(function()
+    if not getgenv().SelectedTarget then
+        TargetDisplay.Text = "ERRO: Selecione um alvo na Aba 1!"
+        return
+    end
+    
+    getgenv().VoidModeActive = not getgenv().VoidModeActive
+    if getgenv().VoidModeActive then
+        getgenv().FlingModeActive = false
+        BtnFling.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+        BtnFling.Text = "Modo Trava + Alvo [OFF]"
+        
+        BtnVoid.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
+        BtnVoid.Text = "Modo Void + Auto-Kill [ON]"
+    else
+        BtnVoid.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+        BtnVoid.Text = "Modo Void + Auto-Kill [OFF]"
+        
+        local myChar = LocalPlayer.Character
+        if myChar and myChar:FindFirstChild("HumanoidRootPart") then
+            myChar.HumanoidRootPart.CFrame = lastTargetPosition + Vector3.new(0, 3, 0)
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(0.2)
+        if getgenv().VoidModeActive then
+            local target = getgenv().SelectedTarget
+            if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+                local tChar = target.Character
+                local tHrp = tChar.HumanoidRootPart
+                local tForceField = tChar:FindFirstChildOfClass("ForceField")
+                local tHum = tChar:FindFirstChildOfClass("Humanoid")
+                
+                lastTargetPosition = tHrp.CFrame
+                
+                local myChar = LocalPlayer.Character
+                local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
+                
+                if tHum and tHum.Health > 0 and myHrp then
+                    if tForceField then
+                        myHrp.CFrame = CFrame.new(VOID_POSITION)
+                        myHrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                    else
+                        local offset = tHrp.CFrame.LookVector * -1
+                        myHrp.CFrame = CFrame.new(tHrp.Position + offset + Vector3.new(0, 0, 0), tHrp.Position)
+                        
+                        local startTime = tick()
+                        local successKill = false
+                        
+                        repeat
+                            task.wait(0.05)
+                            if not target.Character or not target.Character:FindFirstChildOfClass("Humanoid") or target.Character.Humanoid.Health <= 0 then
+                                successKill = true
+                                break
+                            end
+                            if tick() - startTime > 3.7 then
+                                break
+                            end
+                        until not getgenv().VoidModeActive
+                        
+                        local currentMyChar = LocalPlayer.Character
+                        if currentMyChar and currentMyChar:FindFirstChild("HumanoidRootPart") then
+                            currentMyChar.HumanoidRootPart.CFrame = CFrame.new(VOID_POSITION)
+                        end
+                        
+                        if not successKill then
+                            task.wait(3)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+--// Lógica da Função 2 (Modo Trava)
+BtnFling.MouseButton1Click:Connect(function()
+    if not getgenv().SelectedTarget then
+        TargetDisplay.Text = "ERRO: Selecione um alvo na Aba 1!"
+        return
+    end
+
+    getgenv().FlingModeActive = not getgenv().FlingModeActive
+    if getgenv().FlingModeActive then
+        getgenv().VoidModeActive = false
+        BtnVoid.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+        BtnVoid.Text = "Modo Void + Auto-Kill [OFF]"
+        
+        BtnFling.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
+        BtnFling.Text = "Modo Trava + Alvo [ON]"
+    else
+        BtnFling.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+        BtnFling.Text = "Modo Trava + Alvo [OFF]"
+        
+        local myChar = LocalPlayer.Character
+        if myChar then
+            local myHum = myChar:FindFirstChildOfClass("Humanoid")
+            if myHum then myHum.PlatformStand = false end
+        end
+    end
+end)
+
+RunService.Stepped:Connect(function()
+    if getgenv().FlingModeActive then
+        local target = getgenv().SelectedTarget
+        local myChar = LocalPlayer.Character
+        if target and target.Character and myChar then
+            local tHrp = target.Character:FindFirstChild("HumanoidRootPart")
+            local myHrp = myChar:FindFirstChild("HumanoidRootPart")
+            local myHum = myChar:FindFirstChildOfClass("Humanoid")
+            
+            if tHrp and myHrp and myHum then
+                myHrp.CFrame = tHrp.CFrame * CFrame.new(0, 0, 1.5)
+                myHrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                myHum.PlatformStand = false
+            end
+        end
+    end
+end)
+
+--// Lógica da Função 3 (WalkFling Integrado - Sem necessidade de alvo)
+local walkFlingEnabled = false
+local heartbeatConnectionFling = nil
+local characterAddedConnectionFling = nil
+
+local function getRoot(char)
+    return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
+end
+
+local function startWalkFlingLogic()
+    if heartbeatConnectionFling then heartbeatConnectionFling:Disconnect() end
+    
+    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local root = getRoot(character)
+    
+    if not root then return end
+    
+    local movel = 1
+    heartbeatConnectionFling = RunService.Heartbeat:Connect(function()
+        if not walkFlingEnabled then
+            if heartbeatConnectionFling then heartbeatConnectionFling:Disconnect() end
+            return
+        end
+        
+        if character and character.Parent and root and root.Parent then
+            local currentVelocity = root.AssemblyLinearVelocity
+            
+            root.AssemblyLinearVelocity = currentVelocity * 10000 + Vector3.new(0, 10000, 0)
+            RunService.RenderStepped:Wait()
+            
+            if character and character.Parent and root and root.Parent then
+                root.AssemblyLinearVelocity = currentVelocity
+            end
+            
+            RunService.RenderStepped:Wait()
+            if character and character.Parent and root and root.Parent then
+                root.AssemblyLinearVelocity = currentVelocity + Vector3.new(0, movel, 0)
+                movel = movel * -1
+            end
+        end
+    end)
+end
+
+local function stopWalkFlingLogic()
+    walkFlingEnabled = false
+    if heartbeatConnectionFling then
+        heartbeatConnectionFling:Disconnect()
+        heartbeatConnectionFling = nil
+    end
+    
+    local character = LocalPlayer.Character
+    if character then
+        local root = getRoot(character)
+        if root then
+            root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        end
+    end
+end
+
+local function monitorCharacterFling()
+    if characterAddedConnectionFling then characterAddedConnectionFling:Disconnect() end
+    
+    characterAddedConnectionFling = LocalPlayer.CharacterAdded:Connect(function(newCharacter)
+        if walkFlingEnabled then
+            task.wait(0.5)
+            if walkFlingEnabled then
+                startWalkFlingLogic()
+            end
+        end
+    end)
+end
+
+BtnWalkFling.MouseButton1Click:Connect(function()
+    walkFlingEnabled = not walkFlingEnabled
+    
+    if walkFlingEnabled then
+        BtnWalkFling.Text = "WalkFling [ON]"
+        BtnWalkFling.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+        startWalkFlingLogic()
+    else
+        BtnWalkFling.Text = "WalkFling [OFF]"
+        BtnWalkFling.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+        stopWalkFlingLogic()
+    end
+end)
+
+monitorCharacterFling()
+
 -- Ajustes finais de CanvasSize das abas
 PageCombat.CanvasSize = UDim2.new(0, 0, 0, CombatLayout.AbsoluteContentSize.Y + 20)
 PageExtra.CanvasSize = UDim2.new(0, 0, 0, ExtraLayout.AbsoluteContentSize.Y + 20)
 PageProt.CanvasSize = UDim2.new(0, 0, 0, ProtLayout.AbsoluteContentSize.Y + 20)
 PageIndiv.CanvasSize = UDim2.new(0, 0, 0, IndivLayout.AbsoluteContentSize.Y + 20)
+PageFlingVoid.CanvasSize = UDim2.new(0, 0, 0, FlingVoidLayout.AbsoluteContentSize.Y + 20)
 
-print("Troll Hub Master Mobile com 7 Abas carregado com sucesso!")
+print("Troll Hub Master Mobile com 8 Abas carregado com sucesso!")
